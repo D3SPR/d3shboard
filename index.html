@@ -1,0 +1,163 @@
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/styles-dPw_xJBv.css" data-precedence="default"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;family=DM+Sans:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;700&amp;family=Playfair+Display:wght@400;700&amp;family=Bebas+Neue&amp;display=swap" data-precedence="default"/><title>Canvas — Your Own Dashboard</title><meta name="author" content="Lovable"/><meta name="twitter:site" content="@Lovable"/><meta name="description" content="A private, offline dashboard canvas. Drag in clocks, feeds, API values and custom embeds, then style every pixel. No accounts, no tracking."/><meta property="og:title" content="Canvas — Your Own Dashboard"/><meta property="og:description" content="Build a fully customizable dashboard with drag-and-drop widgets, multiple panels and time-based automations. Saved on your device, no login required."/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><link rel="modulepreload" href="assets/index-COzUSGuz.js"/><link rel="modulepreload" href="assets/routes-eSFc1sUC.js"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/><link rel="icon" href="favicon.ico" type="image/x-icon"/>
+<style>
+	#lovable-badge {
+		--badge-bg: #1b1b1b;
+		--badge-text: #c5c1b9;
+		--badge-text-hover: #dcdad5;
+		--badge-radius: 6px;
+		--badge-padding: 8px;
+		--badge-gap: 6px;
+		--badge-shadow: 
+			0 0 0 1px rgba(0, 0, 0, 0.88),
+			0 1px 0 0 rgba(0, 0, 0, 0.04),
+			0 2px 2px -1px rgba(0, 0, 0, 0.08),
+			0 4px 4px -2px rgba(0, 0, 0, 0.08),
+			0 8px 8px -4px rgba(0, 0, 0, 0.08),
+			0 16px 16px -8px rgba(0, 0, 0, 0.08);
+		--badge-transition-duration: 0.2s;
+		--badge-transition-easing: cubic-bezier(0.16, 1, 0.32, 1);
+		--focus-color: #575ECF;
+		--focus-offset: 2px;
+		--focus-width: 2px;
+		
+		position: fixed;
+		bottom: 12px;
+		right: 12px;
+		height: 24px;
+		display: flex;
+		align-items: center;
+		z-index: 1000000;
+		background-color: var(--badge-bg) !important;
+		color: var(--badge-text) !important;
+		border-radius: var(--badge-radius);
+		box-shadow: var(--badge-shadow) !important;
+		font-size: 12px;
+		font-family: CameraPlainVariable, "CameraPlainVariable Fallback", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-weight: 400 !important;
+		text-transform: none !important;
+		font-feature-settings: normal !important;
+		transform: translateZ(0);
+		will-change: transform, opacity;
+	}
+
+	#lovable-badge-cta {
+		display: flex;
+		align-items: center;
+		gap: var(--badge-gap);
+		padding: 0 var(--badge-padding);
+		height: 100%;
+		color: inherit;
+		text-decoration: none;
+		white-space: nowrap;
+		border-radius: var(--badge-radius) 0 0 var(--badge-radius);
+		transition: 
+			background-color var(--badge-transition-duration) ease,
+			color var(--badge-transition-duration) ease,
+			transform 0.1s ease;
+	}
+
+	#lovable-badge-cta:hover {
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--badge-text-hover);
+	}
+
+	#lovable-badge-cta:active {
+		transform: scale(0.98);
+	}
+
+	#lovable-badge-cta:focus {
+		outline: none;
+	}
+
+	#lovable-badge-cta:focus-visible {
+		outline: var(--focus-width) solid var(--focus-color);
+		outline-offset: var(--focus-offset);
+		z-index: 1;
+	}
+
+	#lovable-badge-text {
+		line-height: 1;
+	}
+
+	#lovable-badge-divider {
+		width: 1px;
+		height: 24px;
+		background-color: rgba(255, 255, 255, 0.04);
+		flex-shrink: 0;
+	}
+
+	#lovable-badge-close {
+		width: 24px;
+		height: 24px;
+		min-width: 24px;
+		min-height: 24px;
+		cursor: pointer;
+		background: none;
+		border: none;
+		padding: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0 var(--badge-radius) var(--badge-radius) 0;
+		flex-shrink: 0;
+		transition: 
+			background-color var(--badge-transition-duration) ease,
+			transform 0.1s ease;
+	}
+
+	#lovable-badge-close:hover {
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	#lovable-badge-close:active {
+		transform: scale(0.92);
+	}
+
+	#lovable-badge-close:focus {
+		outline: none;
+	}
+
+	#lovable-badge-close:focus-visible {
+		outline: var(--focus-width) solid var(--focus-color);
+		outline-offset: calc(var(--focus-offset) * -1);
+		z-index: 1;
+	}
+
+	#lovable-badge-close svg path {
+		fill: var(--badge-text);
+		transition: fill var(--badge-transition-duration) ease;
+	}
+
+	#lovable-badge-close:hover svg path {
+		fill: var(--badge-text-hover);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		#lovable-badge-cta,
+		#lovable-badge-close,
+		#lovable-badge-close svg path {
+			transition: none;
+		}
+		
+		#lovable-badge-cta:active,
+		#lovable-badge-close:active {
+			transform: none;
+		}
+	}
+
+	@media (prefers-contrast: high) {
+		#lovable-badge {
+			--badge-bg: #000;
+			--badge-text: #fff;
+			--badge-text-hover: #fff;
+			border: 2px solid currentColor;
+		}
+		
+		#lovable-badge-cta:focus-visible,
+		#lovable-badge-close:focus-visible {
+			outline-width: 3px;
+		}
+	}
+</style>
+<meta name="twitter:title" content="Canvas — Your Own Dashboard"><meta name="twitter:description" content="Build a fully customizable dashboard with drag-and-drop widgets, multiple panels and time-based automations. Saved on your device, no login required."><meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ca4d9cf4266c0a0580ffcae48e85efd3/id-preview-4901bae7--f1f70323-497a-4698-989d-461a636c5de0.lovable.app-1789434304675.png"><meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ca4d9cf4266c0a0580ffcae48e85efd3/id-preview-4901bae7--f1f70323-497a-4698-989d-461a636c5de0.lovable.app-1789434304675.png"></head><body><!--$--><main class="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#08090d] text-white"><header class="relative z-30 flex h-12 shrink-0 items-center gap-1.5 border-b border-white/10 bg-[#0d0f15] px-2 text-xs text-white sm:gap-2 sm:px-3"><span class="mr-1 hidden shrink-0 font-semibold tracking-[0.24em] uppercase sm:inline" style="color:#7cf5c4">Canvas</span><div class="relative shrink-0"><button class="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10 ">Add</button></div><div class="relative shrink-0"><button class="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10 ">Canvas</button></div><div class="relative shrink-0"><button class="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10 ">Desktop</button></div><div class="relative shrink-0"><button class="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10 ">Panels</button></div><button class="shrink-0 rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10">Automations</button><div class="relative shrink-0"><button class="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10 ">File</button></div><button class="ml-auto shrink-0 rounded-md px-3 py-1.5 font-medium" style="background:#7cf5c4;color:#08090d">Done</button></header><div class="relative min-h-0 flex-1"><div class="relative h-full w-full overflow-hidden"><div class="h-full w-full"><div class="relative h-full min-h-full w-full overflow-hidden" style="background:linear-gradient(145deg, #0a0b10, #151a2b);font-family:&quot;Space Grotesk&quot;, system-ui, sans-serif"><div class="pointer-events-none absolute inset-0 opacity-60" style="background-image:radial-gradient(circle, #7cf5c433 1px, transparent 1px);background-size:20px 20px"></div><div class="absolute " style="left:80px;top:90px;width:320px;height:160px;z-index:1;opacity:1;touch-action:none;cursor:grab"><div class="flex h-full w-full flex-col overflow-hidden" style="background:#12141aE6;color:#ecf0f7;border:1px solid #ffffff1f;border-radius:18px;padding:18px;font-family:inherit;font-size:16px;font-weight:500;letter-spacing:0;text-align:left;box-shadow:0 18px 50px -20px rgba(0,0,0,.75);backdrop-filter:blur(14px);outline-offset:3px"><div class="relative min-h-0 flex-1"><div class="flex h-full w-full flex-col justify-center gap-1"><div style="font-size:2.4em;font-weight:700;line-height:1"></div><div style="opacity:0.6;font-size:0.85em"></div></div><div class="absolute inset-0"></div></div></div><button aria-label="Edit Clock" class="absolute top-1/2 left-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[13px] shadow-lg shadow-black/50" style="background:#7cf5c4;color:#08090d">✎</button></div><div class="absolute " style="left:440px;top:90px;width:300px;height:180px;z-index:2;opacity:1;touch-action:none;cursor:grab"><div class="flex h-full w-full flex-col overflow-hidden" style="background:#12141aE6;color:#ecf0f7;border:1px solid #ffffff1f;border-radius:18px;padding:18px;font-family:inherit;font-size:16px;font-weight:500;letter-spacing:0;text-align:left;box-shadow:0 18px 50px -20px rgba(0,0,0,.75);backdrop-filter:blur(14px);outline-offset:3px"><div class="relative min-h-0 flex-1"><div class="h-full w-full overflow-auto whitespace-pre-wrap">Double-click me in edit mode.</div><div class="absolute inset-0"></div></div></div><button aria-label="Edit Note" class="absolute top-1/2 left-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[13px] shadow-lg shadow-black/50" style="background:#7cf5c4;color:#08090d">✎</button></div><div class="absolute " style="left:80px;top:300px;width:380px;height:320px;z-index:3;opacity:1;touch-action:none;cursor:grab"><div class="flex h-full w-full flex-col overflow-hidden" style="background:#12141aE6;color:#ecf0f7;border:1px solid #ffffff1f;border-radius:18px;padding:18px;font-family:inherit;font-size:16px;font-weight:500;letter-spacing:0;text-align:left;box-shadow:0 18px 50px -20px rgba(0,0,0,.75);backdrop-filter:blur(14px);outline-offset:3px"><div class="mb-2 shrink-0 text-[0.7em] uppercase" style="letter-spacing:0.16em;opacity:0.55">News feed</div><div class="relative min-h-0 flex-1"><div style="opacity:0.5">Loading…</div><div class="absolute inset-0"></div></div></div><button aria-label="Edit News feed" class="absolute top-1/2 left-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[13px] shadow-lg shadow-black/50" style="background:#7cf5c4;color:#08090d">✎</button></div></div></div></div></div></main><script>(function(a,f){let l;try{l=JSON.parse(sessionStorage.getItem(a)||"{}")}catch{return}const n=l?.[f||history.state?.__TSR_key];let c=!1;for(const t in n){const e=n[t],o=e?.scrollX,s=e?.scrollY;if(Number.isFinite(o)&&Number.isFinite(s)){if(t==="window")scrollTo(o,s),c=!0;else if(t)try{const r=document.querySelector(t);r&&(r.scrollLeft=o,r.scrollTop=s)}catch{}}}if(c)return;const i=location.hash.slice(1);if(i){const t=history.state?.__hashScrollIntoViewOptions??!0;if(t){const e=document.getElementById(i);e&&e.scrollIntoView(t)}return}scrollTo(0,0)})("tsr-scroll-restoration-v1_3");document.currentScript.remove()</script><!--/$--><script class="$tsr" id="$tsr-stream-barrier">(self.$R=self.$R||{})["tsr"]=[];self.$_TSR={h(){this.hydrated=!0,this.c()},e(){this.streamEnded=!0,this.c()},c(){this.hydrated&&this.streamEnded&&(delete self.$_TSR,delete self.$R.tsr)},p(e){this.initialized?e():this.buffer.push(e)},buffer:[]};$_TSR.router=($R=>$R[0]={manifest:$R[1]={routes:$R[2]={__root__:$R[3]={preloads:$R[4]=["/assets/index-COzUSGuz.js"],scripts:$R[5]=[$R[6]={attrs:$R[7]={type:"module",async:!0,src:"/assets/index-COzUSGuz.js"}}]},"/":$R[8]={preloads:$R[9]=["/assets/routes-eSFc1sUC.js"]}}},matches:$R[10]=[$R[11]={i:"__root__ ",u:1789590336879,s:"success",ssr:!0},$R[12]={i:"  ",u:1789590336879,s:"success",ssr:!0}],lastMatchId:"  "})($R["tsr"]);$_TSR.e();document.currentScript.remove()</script><script type="module" async="" src="assets/index-COzUSGuz.js"></script>
+</body></html>
