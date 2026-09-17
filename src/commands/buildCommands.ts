@@ -104,8 +104,9 @@ export function buildCommands(ctx: CommandContext): Command[] {
         label: `Delete ${name}`,
         group: "Selected component",
         icon: "trash",
-        keywords: "remove trash",
-        run: () => confirm(`Delete ${name}?`) && a.removeWidget(selected.id),
+        detail: "⌫",
+        keywords: "remove trash backspace",
+        run: () => a.removeWidget(selected.id),
       },
       {
         id: "sel.front",

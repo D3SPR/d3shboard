@@ -62,6 +62,15 @@ export default function App() {
   const [showAgent, setShowAgent] = useState(false);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [lastDeleted, setLastDeleted] = useState<{
+    panelId: string;
+    widget: Widget;
+    index: number;
+    animations: AnimationRule[];
+  } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const canvasRef = useRef<HTMLDivElement>(null);
   const bridge = useAgentBridge(doc, setDoc);
 
@@ -295,6 +304,66 @@ export default function App() {
     setAnimationsOpen({ editId: rule.id });
   };
 
+  const deleteWithUndo = (id: string) => {
+    const index = panel.widgets.findIndex((w) => w.id === id);
+    if (index < 0) return;
+    const kept = new Set(removeWidgetFromPanel(panel, id).animations);
+    setLastDeleted({
+      panelId: panel.id,
+      widget: panel.widgets[index],
+      index,
+      animations: panel.animations.filter((a) => !kept.has(a)),
+    });
+    removeWidget(id);
+    clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setLastDeleted(null), 6000);
+  };
+
+  const undoDelete = () => {
+    if (!lastDeleted) return;
+    const { panelId, widget, index, animations } = lastDeleted;
+    setDoc((d) => ({
+      ...d,
+      panels: d.panels.map((p) =>
+        p.id === panelId
+          ? { ...p, widgets: [...p.widgets.slice(0, index), widget, ...p.widgets.slice(index)], animations: [...p.animations, ...animations] }
+          : p,
+      ),
+    }));
+    setSelectedId(widget.id);
+    setLastDeleted(null);
+    clearTimeout(undoTimer.current);
+  };
+
+  const showNotice = (text: string) => {
+    setNotice(text);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 2500);
+  };
+
+  const overlayOpen =
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || paletteOpen || showWelcome || openMenu !== null;
+
+  useEffect(() => {
+    if (!editing || overlayOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.tagName === "INPUT" || t?.tagName === "TEXTAREA" || t?.tagName === "SELECT" || t?.isContentEditable) return;
+      if ((e.key === "Backspace" || e.key === "Delete") && !e.ctrlKey && !e.metaKey && !e.altKey && selectedId) {
+        const widget = panel.widgets.find((w) => w.id === selectedId);
+        if (!widget) return;
+        e.preventDefault();
+        if (widget.locked) showNotice("This component is locked.");
+        else deleteWithUndo(widget.id);
+      } else if (lastDeleted && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoDelete();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const resetDoc = () => {
     if (confirm("Start over? This wipes your whole dashboard and can't be undone (unless you've downloaded a backup).")) {
       setDoc(starterDoc());
@@ -332,7 +401,7 @@ export default function App() {
           editWidget: setEditingWidgetId,
           selectWidget: setSelectedId,
           duplicateWidget,
-          removeWidget,
+          removeWidget: deleteWithUndo,
           updateWidget,
           setHidden: (id, hidden) => updateRect(id, { hidden }),
           patchPanel: patchActivePanel,
@@ -438,6 +507,34 @@ export default function App() {
           <div className="rounded-full bg-black/75 px-4 py-2 text-center text-[13px] text-white shadow-lg backdrop-blur">
             This is your finished dashboard. Tap the pencil in the corner to edit again.
           </div>
+        </div>
+      ) : null}
+
+      {editing && (lastDeleted || notice) ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex flex-col items-center gap-2 px-4">
+          {notice ? (
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-[13px] text-white shadow-lg shadow-black/50 backdrop-blur"
+            >
+              <Icon name="lock" size={14} className="text-[var(--accent)]" />
+              {notice}
+            </div>
+          ) : null}
+          {lastDeleted ? (
+            <div
+              role="status"
+              className="pointer-events-auto flex items-center gap-3 rounded-full bg-black/80 py-1.5 pr-1.5 pl-4 text-[13px] text-white shadow-lg shadow-black/50 backdrop-blur"
+            >
+              Deleted “{lastDeleted.widget.title}”
+              <button
+                onClick={undoDelete}
+                className="rounded-full bg-[var(--accent)] px-3 py-1 text-[12.5px] font-semibold text-[var(--accent-ink)] hover:brightness-110"
+              >
+                Undo
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
