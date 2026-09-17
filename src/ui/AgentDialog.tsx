@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { BRAND } from "../brand";
 import { BRIDGE_MCP_URL, BRIDGE_WS_URL } from "../bridge/protocol";
 import type { AgentBridge, BridgeStatus } from "../bridge/useAgentBridge";
@@ -42,6 +42,26 @@ function CopyBlock({ text }: { text: string }) {
   );
 }
 
+// Chrome asks the viewer's permission before a hosted page may reach a program on their own computer.
+function useLocalNetworkPermission(enabled: boolean) {
+  const [state, setState] = useState<PermissionState | null>(null);
+  useEffect(() => {
+    if (!enabled || !navigator.permissions) return;
+    let status: PermissionStatus | null = null;
+    const onChange = () => status && setState(status.state);
+    navigator.permissions
+      .query({ name: "local-network-access" as PermissionName })
+      .then((s) => {
+        status = s;
+        setState(s.state);
+        s.addEventListener("change", onChange);
+      })
+      .catch(() => setState(null)); // Browser doesn't gate this; nothing to report.
+    return () => status?.removeEventListener("change", onChange);
+  }, [enabled]);
+  return state;
+}
+
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <section className="mb-5">
@@ -62,6 +82,7 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
   const [draftCode, setDraftCode] = useState(settings.code);
   const meta = STATUS[status];
   const loopbackBridge = /^wss?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/)/.test(settings.url);
+  const localNetwork = useLocalNetworkPermission(!isLocalPage && loopbackBridge);
 
   const connect = () => {
     const code = draftCode.trim().toUpperCase();
@@ -107,6 +128,17 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
             It's served over plain http from {PAGE_ORIGIN}. Browsers only let a page talk to a program on your own computer when the
             page is secure (https) or is on localhost, so the bridge can't connect here. Open the https address of this site, or run
             d3shboard locally.
+          </p>
+        </div>
+      ) : null}
+
+      {localNetwork === "denied" && status !== "connected" ? (
+        <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-[12.5px] leading-relaxed text-red-100/90">
+          <p className="mb-1.5 font-semibold">Your browser is blocking this page</p>
+          <p>
+            It won't let {PAGE_ORIGIN} reach programs on your computer, so the bridge can't be found. Look for the icon at the left
+            of the address bar, allow local network access for this site, then reload. Some browsers (Safari, and browsers in
+            private mode) don't allow it at all — there, run d3shboard on your own computer instead.
           </p>
         </div>
       ) : null}
