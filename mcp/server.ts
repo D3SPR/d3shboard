@@ -10,22 +10,19 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { WebSocketServer, type WebSocket } from "ws";
 import {
   BRIDGE_HOST,
-  BRIDGE_PORT,
   BRIDGE_PROTOCOL_VERSION,
   type BridgeMethod,
   type PageToServer,
   type ServerToPage,
 } from "../src/bridge/protocol.ts";
+import { CONFIG_FILE, loadConfig, matchesPattern, normalizeOrigin } from "./config.ts";
 import { registerTools } from "./tools.ts";
 
-const STDIO = process.argv.includes("--stdio");
-const PORT = Number(process.env.D3SH_BRIDGE_PORT ?? BRIDGE_PORT);
+const { config: CONFIG, added: SAVED_ENTRIES, persisted: CONFIG_SAVED, forgot: CONFIG_FORGOT } = loadConfig();
+const STDIO = CONFIG.stdio;
+const PORT = CONFIG.port;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CODE_FILE = join(HERE, ".pairing-code");
-const EXTRA_ORIGINS = (process.env.D3SH_ALLOWED_ORIGINS ?? "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
 
 // stdout carries the MCP protocol in stdio mode, so all logging goes to stderr.
 const log = (...args: unknown[]) => console.error("[d3shboard]", ...args);
@@ -53,7 +50,37 @@ const codeMatches = (given: string) => {
 
 const LOCAL_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `[::1]:${PORT}`]);
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const originAllowed = (origin: string | undefined) => !!origin && (LOCAL_ORIGIN.test(origin) || EXTRA_ORIGINS.includes(origin));
+
+const originAllowed = (origin: string | undefined) => {
+  if (!origin) return false;
+  const value = normalizeOrigin(origin);
+  if (LOCAL_ORIGIN.test(value) || CONFIG.anyOrigin) return true;
+  return CONFIG.allowedOrigins.some((pattern) => matchesPattern(value, pattern));
+};
+
+// Keeps DNS rebinding out: a name that resolves here still can't drive the bridge unless it's allowed.
+const hostAllowed = (host: string | undefined) => {
+  if (!host) return false;
+  const value = host.toLowerCase();
+  if (LOCAL_HOSTS.has(value)) return true;
+  const withoutPort = value.replace(/:\d+$/, "");
+  return CONFIG.allowedHosts.some((p) => matchesPattern(value, p) || matchesPattern(withoutPort, p));
+};
+
+const howToAllow = (origin: string) =>
+  `Run the bridge with --allow-origin ${origin} (it is remembered in ${CONFIG_FILE}).`;
+
+const corsHeaders = (origin: string) => ({
+  "access-control-allow-origin": origin,
+  "access-control-allow-credentials": "false",
+  "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+  "access-control-allow-headers": "content-type, accept, authorization, mcp-session-id, mcp-protocol-version, last-event-id",
+  "access-control-expose-headers": "mcp-session-id",
+  "access-control-max-age": "600",
+  // Asked for when a public page reaches a server on the user's own machine.
+  "access-control-allow-private-network": "true",
+  "access-control-allow-local-network-access": "true",
+});
 
 class PageLink {
   socket: WebSocket | null = null;
@@ -176,9 +203,21 @@ const deny = (res: ServerResponse, status: number, message: string) => {
 };
 
 const httpServer = createServer(async (req, res) => {
-  if (!LOCAL_HOSTS.has(req.headers.host ?? "")) return deny(res, 403, "Forbidden host");
+  if (!hostAllowed(req.headers.host)) return deny(res, 403, "Forbidden host");
   const origin = req.headers.origin;
-  if (origin && !originAllowed(origin)) return deny(res, 403, "Forbidden origin");
+  const allowed = !origin || originAllowed(origin);
+  if (origin && allowed) Object.entries(corsHeaders(origin)).forEach(([k, v]) => res.setHeader(k, v));
+
+  // Browsers ask permission before a page may talk to this server; answer that before anything else.
+  if (req.method === "OPTIONS") {
+    if (!allowed) return deny(res, 403, `Origin not allowed. ${howToAllow(normalizeOrigin(origin!))}`);
+    res.writeHead(204).end();
+    return;
+  }
+  if (!allowed) {
+    log(`Refused a request from ${origin}. ${howToAllow(normalizeOrigin(origin!))}`);
+    return deny(res, 403, `Origin not allowed. ${howToAllow(normalizeOrigin(origin!))}`);
+  }
 
   const path = new URL(req.url ?? "/", `http://${req.headers.host}`).pathname;
   if (path === "/mcp") {
@@ -211,17 +250,25 @@ let lockedUntil = 0;
 
 httpServer.on("upgrade", (req, socket, head) => {
   const path = new URL(req.url ?? "/", "http://x").pathname;
-  if (path !== "/bridge" || !LOCAL_HOSTS.has(req.headers.host ?? "") || !originAllowed(req.headers.origin)) {
-    log(`Refused a connection from origin ${req.headers.origin ?? "(none)"}`);
+  if (path !== "/bridge" || !hostAllowed(req.headers.host)) {
     socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
     socket.destroy();
     return;
   }
+  const origin = req.headers.origin;
   wss.handleUpgrade(req, socket, head, (ws) => {
     const reject = (reason: string) => {
       ws.send(JSON.stringify({ type: "rejected", reason } satisfies ServerToPage));
       ws.close();
     };
+    // Completing the handshake first lets the page explain the problem instead of showing a dead connection.
+    if (!originAllowed(origin)) {
+      const shown = origin ? normalizeOrigin(origin) : "(unknown)";
+      log(`Refused a connection from ${shown}. ${howToAllow(shown)}`);
+      return reject(
+        `This bridge isn't set up to accept ${shown} yet. On the computer running the bridge, restart it with:  --allow-origin ${shown}`,
+      );
+    }
     const helloTimer = setTimeout(() => ws.close(), 5000);
     ws.once("message", (data) => {
       clearTimeout(helloTimer);
@@ -264,18 +311,32 @@ httpServer.on("error", (err: NodeJS.ErrnoException) => {
 });
 
 httpServer.listen(PORT, BRIDGE_HOST, () => {
+  const sites = CONFIG.anyOrigin
+    ? ["any site (--any-origin)"]
+    : ["localhost", ...CONFIG.allowedOrigins];
   const lines = [
     "",
     "  d3shboard agent bridge is running",
     "",
     `  Pairing code:  ${PAIRING_CODE}   (enter this in d3shboard → Agent)`,
+    `  Accepts:       ${sites.join(", ")}`,
   ];
+  if (CONFIG.allowedHosts.length) lines.push(`  Extra hosts:   ${CONFIG.allowedHosts.join(", ")}`);
   if (!STDIO) {
     lines.push(
       `  MCP endpoint:  http://${BRIDGE_HOST}:${PORT}/mcp`,
       "",
       "  Add it to Claude Code:",
       `    claude mcp add --transport http d3shboard http://${BRIDGE_HOST}:${PORT}/mcp`,
+    );
+  }
+  if (CONFIG_FORGOT) lines.push("", `  Cleared the saved site list in ${CONFIG_FILE}`);
+  else if (CONFIG_SAVED) lines.push("", `  Saved ${SAVED_ENTRIES.join(", ")} to ${CONFIG_FILE} for next time`);
+  if (!CONFIG.anyOrigin && !CONFIG.allowedOrigins.length) {
+    lines.push(
+      "",
+      "  Using a hosted copy of d3shboard? Restart with the site's address, e.g.",
+      "    npm run mcp -- --allow-origin https://example.com",
     );
   }
   console.error(lines.join("\n") + "\n");

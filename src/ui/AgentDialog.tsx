@@ -1,7 +1,11 @@
 import { useState, type ReactNode } from "react";
+import { BRAND } from "../brand";
 import { BRIDGE_MCP_URL, BRIDGE_WS_URL } from "../bridge/protocol";
 import type { AgentBridge, BridgeStatus } from "../bridge/useAgentBridge";
 import { Button, Dialog, Disclosure, Field, Intro, Segmented, Toggle, inputClass } from "./kit";
+
+export const isLocalPage = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+const PAGE_ORIGIN = window.location.origin;
 
 const STATUS: Record<BridgeStatus, { label: string; color: string; hint: string }> = {
   off: { label: "Not connected", color: "#6b6880", hint: "Enter the pairing code below to connect." },
@@ -57,6 +61,7 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
   const [client, setClient] = useState<"claude" | "other">("claude");
   const [draftCode, setDraftCode] = useState(settings.code);
   const meta = STATUS[status];
+  const loopbackBridge = /^wss?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/)/.test(settings.url);
 
   const connect = () => {
     const code = draftCode.trim().toUpperCase();
@@ -95,9 +100,47 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
         passes changes to this tab — you'll see them appear live. Nothing goes through the internet.
       </Intro>
 
+      {!isLocalPage && loopbackBridge && !window.isSecureContext ? (
+        <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-[12.5px] leading-relaxed text-red-100/90">
+          <p className="mb-1.5 font-semibold">This page can't reach your computer</p>
+          <p>
+            It's served over plain http from {PAGE_ORIGIN}. Browsers only let a page talk to a program on your own computer when the
+            page is secure (https) or is on localhost, so the bridge can't connect here. Open the https address of this site, or run
+            d3shboard locally.
+          </p>
+        </div>
+      ) : null}
+
+      {!isLocalPage && status !== "connected" ? (
+        <div className="mb-5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12.5px] leading-relaxed text-white/60">
+          <p className="mb-1.5 font-semibold text-white/80">You're using the hosted version</p>
+          <p>
+            The bridge still runs on your own computer, so two extra things apply: start it with this site's address (step 1 below),
+            and your browser may ask permission for this site to reach a program on your computer — choose allow.
+          </p>
+          <p className="mt-1.5">Safari blocks this kind of connection entirely; use Chrome, Edge or Firefox.</p>
+        </div>
+      ) : null}
+
       <Step n={1} title="Start the bridge">
-        <p className="mb-2 text-[12.5px] text-white/55">In a terminal, inside the d3shboard folder, run:</p>
-        <CopyBlock text="npm run mcp" />
+        {isLocalPage ? (
+          <>
+            <p className="mb-2 text-[12.5px] text-white/55">In a terminal, inside the d3shboard folder, run:</p>
+            <CopyBlock text="npm run mcp" />
+            <p className="mt-2 mb-2 text-[12px] text-white/45">Or, without the folder (needs Node 23.6+):</p>
+            <CopyBlock text={`npx -y github:${BRAND.repo}`} />
+          </>
+        ) : (
+          <>
+            <p className="mb-2 text-[12.5px] text-white/55">
+              In a terminal on this computer, run the command below. It includes this site's address so the bridge will accept it —
+              the bridge remembers it next time. Needs Node 23.6 or newer.
+            </p>
+            <CopyBlock text={`npx -y github:${BRAND.repo} --allow-origin ${PAGE_ORIGIN}`} />
+            <p className="mt-2 mb-2 text-[12px] text-white/45">If you have the d3shboard folder, this does the same:</p>
+            <CopyBlock text={`npm run mcp -- --allow-origin ${PAGE_ORIGIN}`} />
+          </>
+        )}
         <p className="mt-2 text-[12px] text-white/45">It shows a pairing code. Leave it running while you use your agent.</p>
       </Step>
 
@@ -126,12 +169,18 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
             </p>
             <CopyBlock text={JSON.stringify({ mcpServers: { d3shboard: { type: "http", url: BRIDGE_MCP_URL } } }, null, 2)} />
             <p className="mt-3 mb-2 text-[12.5px] text-white/55">
-              Apps that can only start programs themselves (like Claude Desktop) use this instead — replace the path with where
-              d3shboard lives, and skip step 1:
+              Apps that can only start programs themselves (like Claude Desktop) use this instead, and skip step 1:
             </p>
             <CopyBlock
               text={JSON.stringify(
-                { mcpServers: { d3shboard: { command: "node", args: ["/path/to/d3shboard/mcp/server.ts", "--stdio"] } } },
+                {
+                  mcpServers: {
+                    d3shboard: {
+                      command: "npx",
+                      args: ["-y", `github:${BRAND.repo}`, "--stdio", ...(isLocalPage ? [] : ["--allow-origin", PAGE_ORIGIN])],
+                    },
+                  },
+                },
                 null,
                 2,
               )}
@@ -191,7 +240,11 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
       </p>
 
       <Disclosure title="Advanced">
-        <Field label="Bridge address" help="Only change this if you started the bridge on a different port (D3SH_BRIDGE_PORT)." stacked>
+        <Field
+          label="Bridge address"
+          help="Change this if you started the bridge on a different port (--port), or if you reach it through a tunnel — then use wss://your-tunnel-address/bridge and start the bridge with --allow-host your-tunnel-address."
+          stacked
+        >
           <input className={inputClass} value={settings.url} onChange={(e) => setSettings({ url: e.target.value })} />
         </Field>
         {settings.url !== BRIDGE_WS_URL ? (

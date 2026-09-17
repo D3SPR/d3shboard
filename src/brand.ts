@@ -6,4 +6,5 @@ export const BRAND = {
   chrome: "#0e0d16",
   ink: "#0b0a12",
   exportFileName: "d3shboard.json",
+  repo: "D3SPR/d3shboard",
 } as const;

@@ -3,3 +3,4 @@ dist
 *.tsbuildinfo
 mcp/.pairing-code
 dist-single
+mcp/bridge.json
