@@ -15,6 +15,7 @@ npm run dev        # Vite dev server on http://localhost:5173
 npm run mcp        # AI agent bridge (MCP over HTTP) on http://127.0.0.1:7331/mcp
 npm run typecheck  # app (tsc -b) + MCP server (tsc -p mcp)
 npm run build      # typecheck + production build to dist/
+npm run build:single  # one self-contained HTML file in dist-single/ (JS, CSS and favicon inlined) for static hosting
 ```
 
 `node mcp/server.ts --stdio` runs the same bridge for MCP clients that launch servers themselves. The MCP server runs as TypeScript directly via Node's built-in type stripping (Node 23.6+), with no build step.
@@ -68,7 +69,7 @@ Opened with Ctrl+K / ⌘K or Ctrl+Space (the listener is on `window` in the capt
 - Menus/dialogs are written for non-technical users: plain-language labels, a short intro line, `help` explanations on anything non-obvious, and ready-made presets/templates. Keep new settings consistent with that tone. Raw power-user values stay reachable behind a `Disclosure` (e.g. arbitrary CSS colours, unknown widget config keys in "Other settings").
 - `WidgetEditor.tsx` has a hand-written form per widget type; it also renders any config keys it doesn't know about so nothing becomes uneditable.
 
-Branding (name, tagline, default accent, export filename) lives in `src/brand.ts`; the logo is `Logo` in `src/ui/icons.tsx` and `public/favicon.svg`.
+Branding (name, tagline, default accent, export filename) lives in `src/brand.ts`; the logo is `Logo` in `src/ui/icons.tsx`, and the favicon is an inline SVG data URI in `index.html` (so the single-file build needs no extra files).
 
 ## Runtime network calls
 
