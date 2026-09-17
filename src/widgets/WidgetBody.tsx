@@ -27,8 +27,16 @@ function Clock({ w }: { w: Widget }) {
   );
 }
 
+// "safe center" centres short content but falls back to top-aligned when it overflows, so nothing is clipped.
+const centreIfAuto = (w: Widget): React.CSSProperties =>
+  w.style.autoFit ? { display: "flex", flexDirection: "column", justifyContent: "safe center" } : {};
+
 function Text({ w }: { w: Widget }) {
-  return <div className="h-full w-full overflow-auto whitespace-pre-wrap">{str(w, "text")}</div>;
+  return (
+    <div className="h-full w-full overflow-auto whitespace-pre-wrap" style={centreIfAuto(w)}>
+      {w.style.autoFit ? <div>{str(w, "text")}</div> : str(w, "text")}
+    </div>
+  );
 }
 
 function Image({ w }: { w: Widget }) {
@@ -112,7 +120,7 @@ function Feed({ w }: { w: Widget }) {
   if (error) return <div style={{ opacity: 0.6 }}>Couldn't load this feed.</div>;
   if (!items) return <div style={{ opacity: 0.5 }}>Loading…</div>;
   return (
-    <ul className="flex h-full w-full flex-col gap-2 overflow-auto">
+    <ul className="flex h-full w-full flex-col gap-2 overflow-auto" style={w.style.autoFit ? { justifyContent: "safe center" } : undefined}>
       {items.slice(0, count).map((item) => (
         <li key={item.link}>
           <a href={item.link} target="_blank" rel="noreferrer" className="block leading-snug hover:underline">
@@ -157,7 +165,7 @@ function ApiValue({ w }: { w: Widget }) {
 
   return (
     <div className="flex h-full w-full items-center">
-      <div style={{ fontSize: "1.8em", fontWeight: 700 }}>
+      <div className="w-full" style={{ fontSize: "1.8em", fontWeight: 700 }}>
         {str(w, "prefix")}
         {value}
         {str(w, "suffix")}

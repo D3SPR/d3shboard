@@ -140,14 +140,20 @@ export function Segmented<T extends string>({
   options,
   onChange,
   size = "md",
+  disabled,
 }: {
   value: T;
   options: { value: T; label: ReactNode; title?: string }[];
   onChange: (v: T) => void;
   size?: "sm" | "md";
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex w-full rounded-lg bg-white/[0.06] p-0.5" role="radiogroup">
+    <div
+      className={`flex w-full rounded-lg bg-white/[0.06] p-0.5 ${disabled ? "pointer-events-none opacity-40" : ""}`}
+      role="radiogroup"
+      aria-disabled={disabled || undefined}
+    >
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -156,6 +162,7 @@ export function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            disabled={disabled}
             title={o.title}
             onClick={() => onChange(o.value)}
             className={`flex flex-1 items-center justify-center gap-1 rounded-md px-2 ${size === "sm" ? "py-1 text-[11.5px]" : "py-1.5 text-[12.5px]"} transition ${active ? "bg-[var(--accent)] font-medium text-[var(--accent-ink)]" : "text-white/70 hover:bg-white/10"}`}
@@ -192,6 +199,7 @@ export function Slider({
   step = 1,
   onChange,
   format,
+  disabled,
 }: {
   value: number;
   min: number;
@@ -199,17 +207,19 @@ export function Slider({
   step?: number;
   onChange: (v: number) => void;
   format?: (v: number) => string;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex w-full max-w-[220px] items-center gap-2">
+    <div className={`flex w-full max-w-[220px] items-center gap-2 ${disabled ? "opacity-40" : ""}`}>
       <input
         type="range"
         min={min}
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-1 disabled:cursor-not-allowed"
       />
       <span className="w-12 shrink-0 text-right text-[12px] text-white/60 tabular-nums">
         {format ? format(value) : value}

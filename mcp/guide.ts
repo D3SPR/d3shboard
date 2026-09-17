@@ -74,10 +74,11 @@ export function buildGuide() {
 ${widgets}
 
 ## Component style (all fields optional, merged into the current style)
-Defaults: \`${JSON.stringify(defaultStyle())}\`
+Defaults for new components: \`${JSON.stringify(defaultStyle())}\`
+- **\`autoFit\`** (on for new components): text size and \`padding\` scale with the box, and content is centred horizontally and vertically. The scale is min(width ÷ default width, height ÷ default height) for that component type, applied separately per screen, so making a box bigger makes its content bigger. While it's on, \`fontSize\`, \`padding\` and \`align\` are ignored. Setting any of them turns \`autoFit\` off (pass \`autoFit: true\` in the same call to keep it on). \`get_dashboard\` reports the calculated values as \`autoFitResult\`. Prefer leaving autoFit on and sizing the box instead of setting a font size.
 - \`bg\`: any CSS background. Use 8-digit hex for transparency (e.g. #15131fE6) or a gradient.
-- \`fg\` text colour, \`border\` colour, \`borderWidth\` 0–12, \`radius\` 0–60, \`padding\` 0–60.
-- \`fontFamily\`: "inherit" (page font) or one of ${FONTS.map((f) => `"${f}"`).join(", ")}. \`fontSize\` 8–96, \`fontWeight\` 100–900, \`letterSpacing\` -3–12, \`align\` left|center|right.
+- \`fg\` text colour, \`border\` colour, \`borderWidth\` 0–12, \`radius\` 0–60, \`padding\` 0–120.
+- \`fontFamily\`: "inherit" (page font) or one of ${FONTS.map((f) => `"${f}"`).join(", ")}. \`fontSize\` 6–240, \`fontWeight\` 100–900, \`letterSpacing\` -3–12, \`align\` left|center|right.
 - \`opacity\` 0.1–1, \`shadow\` none|soft|hard|glow (glow uses the page accent), \`blur\` true for frosted glass behind see-through backgrounds.
 - \`animation\`: none|float|pulse|fade|slide — a gentle never-ending idle motion. For anything else use animations below.
 - \`showTitle\` (on the component, not in style) shows the component's title as a small heading.

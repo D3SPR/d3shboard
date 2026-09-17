@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { BREAKPOINTS, FONTS, rectFor } from "../lib/board";
+import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
 import type { AnimationRule, BreakpointKey, IdleAnimation, Rect, RenderBoard, Widget, WidgetStyle } from "../lib/types";
 import { formatDate, listLeafPaths } from "../lib/util";
 import { catalogEntry } from "../widgets/catalog";
 import { describeRule } from "./AnimationsDialog";
 import { Icon, type IconName } from "./icons";
 import { ACCENT_SWATCHES } from "./Toolbar";
-import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
+import { Button, ColorField, Dialog, Disclosure, Field, Help, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
 
 type Tab = "content" | "look" | "position" | "motion";
 
@@ -94,7 +94,7 @@ export function WidgetEditor(props: Props) {
         />
       </div>
       {tab === "content" ? <ContentTab {...props} /> : null}
-      {tab === "look" ? <LookTab widget={widget} accent={board.accent} update={props.update} /> : null}
+      {tab === "look" ? <LookTab widget={widget} accent={board.accent} bp={props.bp} update={props.update} /> : null}
       {tab === "position" ? <PositionTab {...props} /> : null}
       {tab === "motion" ? <MotionTab {...props} /> : null}
     </Dialog>
@@ -392,12 +392,51 @@ const STYLE_PRESETS: { label: string; style: Partial<WidgetStyle> }[] = [
   { label: "Loud", style: { bg: "#c7b8ff", fg: "#0b0a12", border: "#0b0a12", borderWidth: 2, radius: 22, padding: 18, shadow: "hard", blur: false, fontWeight: 700 } },
 ];
 
-function LookTab({ widget, accent, update }: { widget: Widget; accent: string; update: Props["update"] }) {
+function AutoTag() {
+  return (
+    <span className="rounded bg-[var(--accent)]/15 px-1 py-px text-[9.5px] font-semibold tracking-wider text-[var(--accent)] uppercase">
+      Auto
+    </span>
+  );
+}
+
+function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: string; bp: BreakpointKey; update: Props["update"] }) {
   const st = widget.style;
   const set = (patch: Partial<WidgetStyle>) => update(widget.id, { style: { ...st, ...patch } });
+  const auto = st.autoFit;
+  const shown = effectiveStyle(widget, rectFor(widget, bp));
 
   return (
     <>
+      <div
+        className={`mb-5 flex items-center gap-3 rounded-xl border p-3 ${auto ? "border-[var(--accent)]/50 bg-[var(--accent)]/[0.07]" : "border-white/10"}`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+            Auto-fit to box
+            <Help>
+              Text size, the space inside and alignment follow the size of the box — drag its corners and everything grows or shrinks
+              with it, centred. Each screen size fits separately. Turn this off to set them yourself; the component keeps its current
+              look.
+            </Help>
+          </div>
+          <p className="text-[12px] text-white/55">
+            {auto
+              ? `Right now: text ${Math.round(shown.fontSize)}px · spacing ${shown.padding}px · centred`
+              : "Off — text size, spacing and alignment are set by hand below."}
+          </p>
+        </div>
+        <Toggle
+          checked={auto}
+          label="Auto-fit to box"
+          onChange={(on) =>
+            on
+              ? set({ autoFit: true })
+              : set({ autoFit: false, fontSize: Math.round(shown.fontSize), padding: shown.padding, align: shown.align })
+          }
+        />
+      </div>
+
       <Section title="Quick styles" hint="Start from a ready-made look, then fine-tune below.">
         <div className="grid grid-cols-3 gap-1.5">
           {STYLE_PRESETS.map((p) => (
@@ -446,12 +485,22 @@ function LookTab({ widget, accent, update }: { widget: Widget; accent: string; u
         <Field label="Border thickness">
           <Slider value={st.borderWidth} min={0} max={12} onChange={(borderWidth) => set({ borderWidth })} format={(v) => `${v}px`} />
         </Field>
-        <Field label="Space inside" help="Gap between the edge of the box and what's inside it.">
-          <Slider value={st.padding} min={0} max={60} onChange={(padding) => set({ padding })} format={(v) => `${v}px`} />
+        <Field
+          label={<span className="flex items-center gap-1.5">Space inside {auto ? <AutoTag /> : null}</span>}
+          help={auto ? "Set automatically by Auto-fit. Turn Auto-fit off at the top to change it." : "Gap between the edge of the box and what's inside it."}
+        >
+          <Slider
+            value={shown.padding}
+            min={0}
+            max={120}
+            disabled={auto}
+            onChange={(padding) => set({ padding })}
+            format={(v) => `${v}px`}
+          />
         </Field>
       </Section>
 
-      <Section title="Text">
+      <Section title="Text" hint={auto ? "Size and alignment follow the box while Auto-fit is on." : undefined}>
         <Field label="Font" stacked>
           <select className={inputClass} value={st.fontFamily} onChange={(e) => set({ fontFamily: e.target.value })}>
             <option value="inherit">Same as the page</option>
@@ -462,8 +511,18 @@ function LookTab({ widget, accent, update }: { widget: Widget; accent: string; u
             ))}
           </select>
         </Field>
-        <Field label="Size">
-          <Slider value={st.fontSize} min={8} max={96} onChange={(fontSize) => set({ fontSize })} format={(v) => `${v}px`} />
+        <Field
+          label={<span className="flex items-center gap-1.5">Size {auto ? <AutoTag /> : null}</span>}
+          help={auto ? "Set automatically by Auto-fit. Turn Auto-fit off at the top to change it." : undefined}
+        >
+          <Slider
+            value={shown.fontSize}
+            min={6}
+            max={240}
+            disabled={auto}
+            onChange={(fontSize) => set({ fontSize })}
+            format={(v) => `${Math.round(v)}px`}
+          />
         </Field>
         <Field label="Boldness">
           <Slider value={st.fontWeight} min={100} max={900} step={100} onChange={(fontWeight) => set({ fontWeight })} />
@@ -471,9 +530,10 @@ function LookTab({ widget, accent, update }: { widget: Widget; accent: string; u
         <Field label="Letter spacing">
           <Slider value={st.letterSpacing} min={-3} max={12} onChange={(letterSpacing) => set({ letterSpacing })} format={(v) => `${v}px`} />
         </Field>
-        <Field label="Line up text" stacked>
+        <Field label={<span className="flex items-center gap-1.5">Line up text {auto ? <AutoTag /> : null}</span>} stacked>
           <Segmented
-            value={st.align}
+            disabled={auto}
+            value={shown.align}
             onChange={(align) => set({ align })}
             options={[
               { value: "left", label: "Left" },

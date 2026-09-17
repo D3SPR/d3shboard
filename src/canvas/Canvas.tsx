@@ -1,6 +1,6 @@
 import { forwardRef, useRef, useState } from "react";
 import type { BreakpointKey, Rect, RenderBoard, Widget } from "../lib/types";
-import { backgroundCss, createWidget, rectFor, shadowCss } from "../lib/board";
+import { backgroundCss, createWidget, effectiveStyle, rectFor, shadowCss } from "../lib/board";
 import { WidgetBody } from "../widgets/WidgetBody";
 import { Icon } from "../ui/icons";
 
@@ -146,7 +146,7 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
       {board.widgets.map((w) => {
         const rect = rectFor(w, bp);
         if (rect.hidden && !editing) return null;
-        const s = w.style;
+        const s = effectiveStyle(w, rect);
         const selected = editing && selectedId === w.id;
         return (
           <div
@@ -158,7 +158,7 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
               e.stopPropagation();
               onEdit(w.id);
             }}
-            className={`absolute ${s.animation === "none" ? "" : `anim-${s.animation}`}`}
+            className={`absolute ${editing ? "select-none" : ""} ${s.animation === "none" ? "" : `anim-${s.animation}`}`}
             style={{
               left: rect.x,
               top: rect.y,

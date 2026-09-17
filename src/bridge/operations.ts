@@ -6,6 +6,7 @@ import {
   createPanel,
   createWidget,
   defaultBackground,
+  effectiveStyle,
   layoutsFrom,
   normalizeDoc,
   rectFor,
@@ -60,6 +61,12 @@ const replacePanel = (doc: BoardDoc, panel: Panel): BoardDoc => ({
 const defined = <T extends object>(obj: T) =>
   Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 
+const MANUAL_SIZING_KEYS = ["fontSize", "padding", "align"];
+
+// Setting a size or alignment by hand is an override, same as in the editor: auto-fit turns off unless asked otherwise.
+const withOverride = (style: Params | undefined) =>
+  style && style.autoFit === undefined && MANUAL_SIZING_KEYS.some((k) => k in style) ? { ...style, autoFit: false } : style;
+
 const friendlyWidget = (w: Widget) => ({
   id: w.id,
   type: w.type,
@@ -70,6 +77,16 @@ const friendlyWidget = (w: Widget) => ({
   layouts: Object.fromEntries(BREAKPOINTS.map((b) => [BP_TO_SCREEN[b.key], rectFor(w, b.key)])),
   config: w.config,
   style: w.style,
+  ...(w.style.autoFit
+    ? {
+        autoFitResult: Object.fromEntries(
+          BREAKPOINTS.map((b) => {
+            const s = effectiveStyle(w, rectFor(w, b.key));
+            return [BP_TO_SCREEN[b.key], { fontSize: s.fontSize, padding: s.padding, align: s.align }];
+          }),
+        ),
+      }
+    : {}),
 });
 
 const friendlyDoc = (doc: BoardDoc) => ({
@@ -193,7 +210,7 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
         layouts: layoutsFrom(base.x ?? 40, base.y ?? 40, base.w ?? def.w, base.h ?? def.h),
         ...defined({ title: params.title, showTitle: params.showTitle, locked: params.locked }),
         config: { ...widget.config, ...(params.config ?? {}) },
-        style: { ...widget.style, ...(params.style ?? {}) },
+        style: { ...widget.style, ...(withOverride(params.style) ?? {}) },
       };
       for (const [screen, rect] of Object.entries((params.layouts ?? {}) as Record<string, Partial<Rect>>)) {
         const bp = SCREEN_TO_BP[screen] ?? fail(`Unknown screen "${screen}". Use phone, tablet or computer.`);
@@ -212,7 +229,7 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
         ...widget,
         ...defined({ title: params.title, showTitle: params.showTitle, locked: params.locked, z: params.z }),
         config: params.config ? { ...widget.config, ...params.config } : widget.config,
-        style: params.style ? { ...widget.style, ...params.style } : widget.style,
+        style: params.style ? { ...widget.style, ...withOverride(params.style) } : widget.style,
       };
       if (params.bringToFront) updated.z = Math.max(...panel.widgets.map((w) => w.z)) + 1;
       return {

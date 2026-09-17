@@ -1,4 +1,4 @@
-import { BREAKPOINTS, FONTS, rectFor } from "../lib/board";
+import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
 import type { BoardDoc, BreakpointKey, Panel, Widget, WidgetType } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { WIDGET_CATALOG, catalogEntry } from "../widgets/catalog";
@@ -138,6 +138,21 @@ export function buildCommands(ctx: CommandContext): Command[] {
         icon: "eye",
         keywords: "hide show visible screen size",
         run: () => a.setHidden(selected.id, !rect.hidden),
+      },
+      {
+        id: "sel.autofit",
+        label: selected.style.autoFit ? `Turn off auto-fit for ${name}` : `Turn on auto-fit for ${name}`,
+        group: "Selected component",
+        icon: "move",
+        keywords: "auto fit scale size text resize centre center automatic",
+        run: () => {
+          const shown = effectiveStyle(selected, rect);
+          a.updateWidget(selected.id, {
+            style: selected.style.autoFit
+              ? { ...selected.style, autoFit: false, fontSize: Math.round(shown.fontSize), padding: shown.padding, align: shown.align }
+              : { ...selected.style, autoFit: true },
+          });
+        },
       },
       {
         id: "sel.title",

@@ -23,6 +23,7 @@ export type WidgetStyle = {
   shadow: Shadow;
   animation: IdleAnimation;
   blur: boolean;
+  autoFit: boolean;
 };
 
 export type WidgetConfig = Record<string, string | number>;

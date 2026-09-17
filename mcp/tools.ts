@@ -30,16 +30,19 @@ const style = z
     border: z.string().describe("Border colour."),
     borderWidth: z.number().min(0).max(12),
     radius: z.number().min(0).max(60),
-    padding: z.number().min(0).max(60),
+    padding: z.number().min(0).max(120).describe("Ignored while autoFit is on; setting it turns autoFit off."),
     fontFamily: z.string().describe(`"inherit" or one of: ${FONTS.join(", ")}`),
-    fontSize: z.number().min(8).max(96),
+    fontSize: z.number().min(6).max(240).describe("Ignored while autoFit is on; setting it turns autoFit off."),
     fontWeight: z.number().min(100).max(900),
     letterSpacing: z.number().min(-3).max(12),
-    align: z.enum(["left", "center", "right"]),
+    align: z.enum(["left", "center", "right"]).describe("Ignored while autoFit is on; setting it turns autoFit off."),
     opacity: z.number().min(0.1).max(1),
     shadow: z.enum(["none", "soft", "hard", "glow"]),
     animation: z.enum(["none", "float", "pulse", "fade", "slide"]).describe("Gentle idle loop."),
     blur: z.boolean().describe("Frosted glass."),
+    autoFit: z
+      .boolean()
+      .describe("On by default for new components: text size and padding scale with the box and content is centred."),
   })
   .partial();
 

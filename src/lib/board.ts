@@ -45,12 +45,32 @@ export const defaultStyle = (): WidgetStyle => ({
   fontSize: 16,
   fontWeight: 500,
   letterSpacing: 0,
-  align: "left",
+  align: "center",
   opacity: 1,
   shadow: "soft",
   animation: "none",
   blur: true,
+  autoFit: true,
 });
+
+// Auto-fit scales content from how it looks at the type's default size, like object-fit: contain.
+const AUTO_BASE = { fontSize: 16, padding: 18 };
+
+export const autoFitScale = (w: Widget, rect: Rect) => {
+  const ref = WIDGET_DEFAULTS[w.type];
+  return Math.max(0, Math.min(rect.w / ref.w, rect.h / ref.h));
+};
+
+export const effectiveStyle = (w: Widget, rect: Rect): WidgetStyle => {
+  if (!w.style.autoFit) return w.style;
+  const scale = autoFitScale(w, rect);
+  return {
+    ...w.style,
+    fontSize: Math.round(Math.min(400, Math.max(6, AUTO_BASE.fontSize * scale)) * 10) / 10,
+    padding: Math.round(Math.min(120, Math.max(2, AUTO_BASE.padding * scale))),
+    align: "center",
+  };
+};
 
 const fitRect = (rect: Rect, bp: BreakpointKey): Rect => {
   const width = BREAKPOINTS.find((b) => b.key === bp)!.width;
@@ -141,7 +161,8 @@ const normalizeWidgets = (widgets: Loose[]): Widget[] =>
       w.layouts && w.layouts.lg
         ? w.layouts
         : layoutsFrom(w.x ?? 40, w.y ?? 40, w.w ?? 300, w.h ?? 180),
-    style: { ...defaultStyle(), ...(w.style ?? {}) },
+    // Saves from before auto-fit existed keep their manual sizing so existing dashboards don't shift.
+    style: { ...defaultStyle(), autoFit: false, ...(w.style ?? {}) },
     config: { ...(w.config ?? {}) },
   }));
 
