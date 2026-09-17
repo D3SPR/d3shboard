@@ -4,3 +4,4 @@ dist
 mcp/.pairing-code
 dist-single
 mcp/bridge.json
+dist-bridge

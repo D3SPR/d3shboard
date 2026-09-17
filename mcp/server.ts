@@ -1,8 +1,7 @@
 import { randomInt, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -15,14 +14,13 @@ import {
   type PageToServer,
   type ServerToPage,
 } from "../src/bridge/protocol.ts";
-import { CONFIG_FILE, loadConfig, matchesPattern, normalizeOrigin } from "./config.ts";
+import { CONFIG_FILE, STATE_DIR, ensureStateDir, loadConfig, matchesPattern, normalizeOrigin } from "./config.ts";
 import { registerTools } from "./tools.ts";
 
 const { config: CONFIG, added: SAVED_ENTRIES, persisted: CONFIG_SAVED, forgot: CONFIG_FORGOT } = loadConfig();
 const STDIO = CONFIG.stdio;
 const PORT = CONFIG.port;
-const HERE = dirname(fileURLToPath(import.meta.url));
-const CODE_FILE = join(HERE, ".pairing-code");
+const CODE_FILE = join(STATE_DIR, ".pairing-code");
 
 // stdout carries the MCP protocol in stdio mode, so all logging goes to stderr.
 const log = (...args: unknown[]) => console.error("[d3shboard]", ...args);
@@ -36,6 +34,7 @@ function loadPairingCode() {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const pick = (n: number) => Array.from({ length: n }, () => alphabet[randomInt(alphabet.length)]).join("");
   const code = `${pick(4)}-${pick(4)}`;
+  ensureStateDir();
   writeFileSync(CODE_FILE, `${code}\n`, { mode: 0o600 });
   return code;
 }

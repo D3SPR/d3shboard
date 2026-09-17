@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { BRAND } from "../brand";
 import { BRIDGE_MCP_URL, BRIDGE_WS_URL } from "../bridge/protocol";
 import type { AgentBridge, BridgeStatus } from "../bridge/useAgentBridge";
 import { Button, Dialog, Disclosure, Field, Intro, Segmented, Toggle, inputClass } from "./kit";
 
 export const isLocalPage = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 const PAGE_ORIGIN = window.location.origin;
+// Published next to the app so a hosted copy can hand out the bridge without npm or git.
+const BRIDGE_DOWNLOAD = "/d3shboard-bridge.mjs";
 
 const STATUS: Record<BridgeStatus, { label: string; color: string; hint: string }> = {
   off: { label: "Not connected", color: "#6b6880", hint: "Enter the pairing code below to connect." },
@@ -159,16 +160,16 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
           <>
             <p className="mb-2 text-[12.5px] text-white/55">In a terminal, inside the d3shboard folder, run:</p>
             <CopyBlock text="npm run mcp" />
-            <p className="mt-2 mb-2 text-[12px] text-white/45">Or, without the folder (needs Node 23.6+):</p>
-            <CopyBlock text={`npx -y github:${BRAND.repo}`} />
           </>
         ) : (
           <>
             <p className="mb-2 text-[12.5px] text-white/55">
-              In a terminal on this computer, run the command below. It includes this site's address so the bridge will accept it —
-              the bridge remembers it next time. Needs Node 23.6 or newer.
+              In a terminal on this computer, download the bridge and start it. It already includes this site's address, and the
+              bridge remembers it next time. Only Node 22 or newer is needed — no other setup.
             </p>
-            <CopyBlock text={`npx -y github:${BRAND.repo} --allow-origin ${PAGE_ORIGIN}`} />
+            <CopyBlock
+              text={`curl -fsSL ${PAGE_ORIGIN}${BRIDGE_DOWNLOAD} -o d3shboard-bridge.mjs\nnode d3shboard-bridge.mjs --allow-origin ${PAGE_ORIGIN}`}
+            />
             <p className="mt-2 mb-2 text-[12px] text-white/45">If you have the d3shboard folder, this does the same:</p>
             <CopyBlock text={`npm run mcp -- --allow-origin ${PAGE_ORIGIN}`} />
           </>
@@ -208,8 +209,10 @@ export function AgentDialog({ bridge, onClose }: { bridge: AgentBridge; onClose:
                 {
                   mcpServers: {
                     d3shboard: {
-                      command: "npx",
-                      args: ["-y", `github:${BRAND.repo}`, "--stdio", ...(isLocalPage ? [] : ["--allow-origin", PAGE_ORIGIN])],
+                      command: "node",
+                      args: isLocalPage
+                        ? ["/path/to/d3shboard/mcp/server.ts", "--stdio"]
+                        : ["/full/path/to/d3shboard-bridge.mjs", "--stdio", "--allow-origin", PAGE_ORIGIN],
                     },
                   },
                 },

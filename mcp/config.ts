@@ -1,10 +1,22 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BRIDGE_PORT } from "../src/bridge/protocol.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const CONFIG_FILE = join(HERE, "bridge.json");
+
+// In a checkout the pairing code and settings live beside the server; the standalone bundle keeps them in the user's config dir.
+export const STATE_DIR = existsSync(join(HERE, "tools.ts")) ? HERE : join(homedir(), ".config", "d3shboard");
+export const CONFIG_FILE = join(STATE_DIR, "bridge.json");
+
+export const ensureStateDir = () => {
+  try {
+    mkdirSync(STATE_DIR, { recursive: true });
+  } catch {
+    // Falls back to erroring on write, which is reported where it happens.
+  }
+};
 
 export type BridgeConfig = {
   port: number;
@@ -61,6 +73,7 @@ const readStored = (): Stored => {
 
 const writeStored = (stored: Stored) => {
   try {
+    ensureStateDir();
     writeFileSync(CONFIG_FILE, `${JSON.stringify(stored, null, 2)}\n`);
     return true;
   } catch {
