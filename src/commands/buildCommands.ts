@@ -3,6 +3,7 @@ import type { BoardDoc, BreakpointKey, Panel, Widget, WidgetType } from "../lib/
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { WIDGET_CATALOG, catalogEntry } from "../widgets/catalog";
 import type { IconName } from "../ui/icons";
+import { TEMPLATES } from "../templates";
 import { BACKGROUND_PRESETS, NAMED_ACCENTS, type MenuId } from "../ui/Toolbar";
 
 export const GROUP_ORDER = [
@@ -67,6 +68,8 @@ export type CommandContext = {
     importDoc: () => void;
     resetDoc: () => void;
     openAgent: () => void;
+    openTemplates: () => void;
+    applyTemplate: (templateId: string) => void;
     setAgentEnabled: (enabled: boolean) => void;
     undoAgent: () => void;
     finishEditing: () => void;
@@ -209,7 +212,26 @@ export function buildCommands(ctx: CommandContext): Command[] {
     },
     { id: "page.duplicate", label: "Duplicate this page", group: "Pages", icon: "copy", keywords: "copy clone panel", run: () => a.duplicatePanel(panel.id) },
     { id: "page.menu", label: "Open pages menu", group: "Pages", icon: "pages", keywords: "panels manage", run: () => a.openMenu("pages") },
+    {
+      id: "page.templates",
+      label: "Start from a template…",
+      group: "Pages",
+      icon: "sparkles",
+      keywords: "template ready made preset starter layout example",
+      run: a.openTemplates,
+    },
   );
+  for (const t of TEMPLATES) {
+    cmds.push({
+      id: `page.template.${t.id}`,
+      label: `New page from template: ${t.name}`,
+      group: "Pages",
+      icon: t.icon,
+      detail: "Template",
+      keywords: `template starter ready made ${t.description}`,
+      run: () => a.applyTemplate(t.id),
+    });
+  }
   if (doc.panels.length > 1) {
     cmds.push({
       id: "page.delete",

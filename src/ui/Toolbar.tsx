@@ -54,6 +54,7 @@ type Props = {
   onImport: () => void;
   onReset: () => void;
   onHelp: () => void;
+  onTemplates: () => void;
   onAgent: () => void;
   agentStatus: BridgeStatus;
   onCommands: () => void;
@@ -368,6 +369,16 @@ function PagesMenu(props: Props & { close: () => void }) {
   return (
     <>
       <Intro>Pages are separate screens in your dashboard. When viewing, swipe or use the arrow keys to flip between them.</Intro>
+      <Button
+        icon="sparkles"
+        className="mb-3 w-full"
+        onClick={() => {
+          props.close();
+          props.onTemplates();
+        }}
+      >
+        Start from a template
+      </Button>
       {panels.map((p, i) => {
         const active = p.id === activePanelId;
         return (

@@ -21,6 +21,9 @@ export type BridgeMethod =
   | "updateAutomation"
   | "deleteAutomation"
   | "replaceDashboard"
+  | "listTemplates"
+  | "applyTemplate"
+  | "checkDashboard"
   | "undo";
 
 export type PageToServer =

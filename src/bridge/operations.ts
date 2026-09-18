@@ -25,7 +25,9 @@ import type {
   Widget,
   WidgetType,
 } from "../lib/types";
+import { TEMPLATES, buildTemplatePanel, templateById } from "../templates";
 import { WIDGET_DEFAULTS } from "../widgets/defaults";
+import { checkDashboard } from "./diagnostics";
 import type { BridgeMethod } from "./protocol";
 
 export class BridgeError extends Error {}
@@ -351,6 +353,40 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
         summary: `Deleted automation “${rule.name}”`,
       };
     }
+
+    case "listTemplates":
+      return {
+        doc,
+        result: TEMPLATES.map((t) => ({
+          templateId: t.id,
+          name: t.name,
+          description: t.description,
+          contains: t.widgets.map((w) => w.type + " (" + w.title + ")"),
+        })),
+        summary: null,
+      };
+
+    case "applyTemplate": {
+      const template = templateById(String(params.templateId)) ?? fail(`No template "${params.templateId}". Call list_templates.`);
+      const panel = buildTemplatePanel(template, params.name);
+      const next = {
+        ...doc,
+        panels: [...doc.panels, panel],
+        activePanelId: params.show === false ? doc.activePanelId : panel.id,
+      };
+      return {
+        doc: next,
+        result: {
+          pageId: panel.id,
+          name: panel.name,
+          widgets: panel.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })),
+        },
+        summary: `Added page “${panel.name}” from the ${template.name} template`,
+      };
+    }
+
+    case "checkDashboard":
+      return { doc, result: checkDashboard(doc, params), summary: null };
 
     case "replaceDashboard": {
       if (!params.document || typeof params.document !== "object") fail("document must be a dashboard backup object.");

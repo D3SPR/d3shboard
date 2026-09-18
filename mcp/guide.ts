@@ -60,7 +60,8 @@ export function buildGuide() {
 ## How it fits together
 - A dashboard has **pages**. Each page has a theme (accent colour, font, background, grid), **components** (called widgets in the API) and **animations**. **Automations** belong to the whole dashboard.
 - Your changes apply live in the user's open browser tab and save automatically. \`undo_last_change\` reverts your latest change (up to 30 steps).
-- Good workflow: \`get_dashboard\` → make changes → \`get_dashboard\` to check. Don't remove the user's existing content unless they ask.
+- Good workflow: \`list_templates\` → \`apply_template\` (or build by hand) → adapt → **\`check_dashboard\`** → fix what it reports → repeat. Don't remove the user's existing content unless they ask; adding a page leaves their work alone.
+- **You cannot see the dashboard.** \`check_dashboard\` is your eyes: it reports components off the edge or below the fold, overlaps, unreadable colours, failed feeds and live values, content cut off, and errors thrown inside custom panels. A layout that looks right in JSON is regularly broken on screen. It can only inspect real rendering for the page that is currently open, so \`set_view\` to a page before checking it.
 - Ids are returned by every add_* tool. Omitting \`pageId\` means the page currently open in the editor.
 
 ## Layout
@@ -104,6 +105,21 @@ ${properties}
 A rule applies its actions while **all** its conditions are true, only in viewing mode, and reverts when they stop being true. Checked about every 20 seconds.
 - conditions: \`timeRange\` {from, to "HH:MM", may wrap past midnight} | \`weekday\` {days: 0=Sun…6=Sat} | \`monthday\` {days: 1–31} | \`month\` {months: 1–12} | \`dataValue\` {url, path, op: is|isNot|contains|gt|lt, value (string)}.
 - actions: \`setPanel\` {panelId} | \`setAccent\` {color} | \`setFont\` {fontFamily} | \`setBackground\` {background} | \`setWidgetVisible\` {widgetId (any page), visible}.
+
+## Custom panels: the things that go wrong
+A \`embed\` component is a **sandboxed iframe**. It shares nothing with the page, which trips up almost every first attempt:
+- It does **not** inherit the dashboard's dark theme. With no background of its own the browser paints it **white**, so light text becomes invisible. Always start its CSS with \`html, body { background: transparent; color-scheme: dark; }\`.
+- It does **not** inherit the page font. \`@import\` the font you want, or use \`system-ui\`.
+- Scripts run, but there is no \`localStorage\` and no access to the dashboard. Only call APIs that allow browser requests (CORS \`*\`); anything else fails silently.
+- Size content to the box: the frame is exactly the component's inner area. Use \`height: 100%\`, \`overflow: auto\` for lists, and \`@media (max-height: …)\` to drop detail in short boxes. Component auto-fit does not scale anything inside a panel.
+- Errors inside the panel are reported to \`check_dashboard\`, so check after writing one.
+
+## Data sources that work from a browser, with no API key
+- **Weather** — \`https://api.open-meteo.com/v1/forecast?latitude=..&longitude=..&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto\`. Weather codes are WMO numbers; map them to words/icons yourself.
+- **Rough location** — \`https://get.geojs.io/v1/ip/geo.json\` (fields \`latitude\`, \`longitude\`, \`city\`). It follows the network connection, so a VPN moves it; let the user correct it.
+- **Sports scores and fixtures** — \`https://site.api.espn.com/apis/site/v2/sports/<sport>/<league>/scoreboard\`, e.g. \`football/nfl\`, \`football/college-football\`, \`baseball/mlb\`, \`basketball/nba\`, \`basketball/wnba\`, \`hockey/nhl\`. Each event has \`status.type.state\` (\`pre\`, \`in\`, \`post\`), \`status.type.shortDetail\`, \`date\`, and \`competitions[0].competitors[]\` with \`team.abbreviation\`, \`score\` and \`homeAway\`.
+- **News** — any RSS feed through the built-in \`feed\` component (it proxies via rss2json). Reliable ones: BBC \`https://feeds.bbci.co.uk/news/rss.xml\`, NYT \`https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml\`, The Verge \`https://www.theverge.com/rss/index.xml\`, ESPN \`https://www.espn.com/espn/rss/news\`.
+- Prefer the built-in \`feed\` and \`api\` components over a custom panel when they can do the job — they are styled by the dashboard and need no code.
 
 ## Design tips
 - Keep strong contrast between \`fg\` and \`bg\`, and between components and the page background.

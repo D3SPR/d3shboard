@@ -58,7 +58,20 @@ The dashboard only exists in the browser's `localStorage`, so agents can't edit 
 - **Standalone bridge for hosted users.** `npm run build:bridge` (esbuild) bundles the server and its dependencies into one `dist-bridge/d3shboard-bridge.mjs` that runs on plain Node 22+ with no install step; it is published next to the app (e.g. `d3tech.xyz/d3shboard-bridge.mjs`) and the Agent dialog tells hosted users to `curl` it and run it. Do not tell people to `npx github:...`: npm 12 ships `allow-git=none`, so git installs fail by default. `mcp/bin.mjs` remains as the package bin for checkouts and checks the Node version first.
 - When running from a checkout, the pairing code and `bridge.json` sit in `mcp/`; the bundled build stores them in `~/.config/d3shboard` instead (`STATE_DIR` in `config.ts`, chosen by whether `mcp/tools.ts` sits beside the entry point).
 - `mcp/guide.ts` (the `get_guide` tool) is generated from the real preset, property, font and widget-default lists, so it stays in sync. It therefore imports `src/` files at runtime, which means those files (and anything they import at runtime) must use explicit `.ts` extensions on non-type imports. Currently that's `src/lib/board.ts`, `src/brand.ts`, `src/widgets/defaults.ts`, `src/animations/presets.ts`, `src/animations/properties.ts` and `src/bridge/protocol.ts`.
+- The guide includes a custom-panel gotchas section and a list of key-free, CORS-friendly data sources (Open-Meteo, geojs, ESPN scoreboards, RSS) — keep it current when those change.
 - Port: `D3SH_BRIDGE_PORT` (default 7331). The app's bridge address is editable under Agent → Advanced.
+
+### Templates (`src/templates/`)
+`TEMPLATES` describes ready-made pages (theme + widgets with all three screen layouts + an optional pop-in animation); `buildTemplatePanel` turns one into a fresh `Panel` with new ids. They are exposed three ways and must stay in sync: the Pages menu → "Start from a template", palette commands, and the bridge's `list_templates` / `apply_template`. Applying always **adds a page**, never replaces.
+
+`panels.ts` holds the custom-panel HTML (weather, sports) used by templates, generated from standalone files. Because they live in TypeScript template literals, any `\`, backtick or `${` inside the HTML must be escaped — an unescaped `\'` silently became a syntax error inside the panel and only `check_dashboard` caught it.
+
+### Diagnostics (`src/bridge/diagnostics.ts`)
+`check_dashboard` is the agent's only way to see what it built. Two layers:
+- **Model checks** (any page): off-canvas, below-the-fold (the canvas doesn't scroll), overlaps, sub-minimum sizes, missing config (feed/api/image/embed), custom panels with no `color-scheme`, and fg/bg contrast composited over the page background.
+- **Live checks** (only the page currently on screen, found via `data-widget-id`): content taller than its box, feeds that failed or are still loading, live values showing the error dash, broken images, and errors thrown inside custom panels.
+
+Custom panels can't be inspected from outside, so `WidgetBody`'s embed wrapper injects a reporter that posts `error`, `unhandledrejection` and `console.error` up to the page; `bridge/embedLog.ts` collects them (started in `main.tsx`) and diagnostics reads them per widget. Keep that reporter when editing the embed wrapper.
 
 ### Command palette (`src/commands/` + `src/ui/CommandPalette.tsx`)
 Opened with Ctrl+K / ⌘K or Ctrl+Space (the listener is on `window` in the capture phase in `App.tsx`, so it works inside text fields). `buildCommands(ctx)` builds the whole command list from current state each time the palette opens, so commands are contextual: selected-component actions only exist while something is selected, and there's one "Go to page" per page.

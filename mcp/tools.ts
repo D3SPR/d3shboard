@@ -369,6 +369,48 @@ export function registerTools(server: McpServer, call: Call) {
   );
 
   server.registerTool(
+    "list_templates",
+    {
+      title: "List ready-made dashboard layouts",
+      description:
+        "Ready-made pages you can drop in and then adapt: what each one is for and what it contains. Starting from one is usually better than building from an empty page.",
+      annotations: READ,
+    },
+    () => call("listTemplates", {}),
+  );
+
+  server.registerTool(
+    "apply_template",
+    {
+      title: "Add a page from a template",
+      description:
+        "Creates a new page from a template, laid out for computer, tablet and phone, and opens it. Existing pages are untouched. Adapt it afterwards with update_widget / set_widget_layout.",
+      inputSchema: {
+        templateId: z.string().describe("From list_templates."),
+        name: z.string().optional().describe("Name for the new page."),
+        show: z.boolean().optional(),
+      },
+      annotations: WRITE,
+    },
+    (args) => call("applyTemplate", args),
+  );
+
+  server.registerTool(
+    "check_dashboard",
+    {
+      title: "Check a page for problems",
+      description:
+        "Inspects a page and reports what is wrong: components off the edge or below the fold, overlaps, unreadable colour combinations, missing settings, feeds or live values that failed to load, content cut off, and errors thrown inside custom panels. Call this after building or editing — you cannot see the dashboard, and this is how you find out what actually rendered. Live rendering is only inspected for the page currently on screen (use set_view first).",
+      inputSchema: {
+        pageId: z.string().optional().describe("Defaults to the page that is open."),
+        screen: z.enum(["phone", "tablet", "computer"]).optional().describe("Defaults to checking all three."),
+      },
+      annotations: READ,
+    },
+    (args) => call("checkDashboard", args),
+  );
+
+  server.registerTool(
     "undo_last_change",
     {
       title: "Undo the last agent change",

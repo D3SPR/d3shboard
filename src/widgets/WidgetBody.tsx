@@ -65,10 +65,16 @@ function WebPage({ w }: { w: Widget }) {
 
 function CustomEmbed({ w }: { w: Widget }) {
   const html = str(w, "html");
+  // The reporter lets the page (and the agent bridge) see errors thrown inside this sandboxed frame.
   const doc = useMemo(
     () =>
-      `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;color:inherit;font-family:inherit}</style></head><body>${html}</body></html>`,
-    [html],
+      `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;color:inherit;font-family:inherit}</style>` +
+      `<script>(function(){var id=${JSON.stringify(w.id)};function send(m){try{parent.postMessage({__d3sh:1,widgetId:id,message:String(m).slice(0,300)},"*")}catch(e){}}` +
+      `window.addEventListener("error",function(e){send(e.message||"Script error")});` +
+      `window.addEventListener("unhandledrejection",function(e){send((e.reason&&e.reason.message)||e.reason||"Unhandled promise rejection")});` +
+      `var ce=console.error;console.error=function(){send(Array.prototype.join.call(arguments," "));ce.apply(console,arguments)};})();<\/script>` +
+      `</head><body>${html}</body></html>`,
+    [html, w.id],
   );
   return (
     <iframe

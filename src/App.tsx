@@ -24,6 +24,8 @@ import { buildCommands, type Command } from "./commands/buildCommands";
 import { isPaletteHotkey } from "./commands/shortcut";
 import { AgentDialog } from "./ui/AgentDialog";
 import { AnimationsDialog, newAnimationRule } from "./ui/AnimationsDialog";
+import { TemplatesDialog } from "./ui/TemplatesDialog";
+import { buildTemplatePanel, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
 import { Icon } from "./ui/icons";
@@ -62,6 +64,7 @@ export default function App() {
   const [showAgent, setShowAgent] = useState(false);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -342,7 +345,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -363,6 +366,16 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  const applyTemplate = (templateId: string) => {
+    const template = templateById(templateId);
+    if (!template) return;
+    const panel = buildTemplatePanel(template);
+    setDoc((d) => ({ ...d, panels: [...d.panels, panel], activePanelId: panel.id }));
+    setSelectedId(null);
+    setEditingWidgetId(null);
+    setShowTemplates(false);
+  };
 
   const resetDoc = () => {
     if (confirm("Start over? This wipes your whole dashboard and can't be undone (unless you've downloaded a backup).")) {
@@ -423,6 +436,8 @@ export default function App() {
           importDoc,
           resetDoc,
           openAgent: () => setShowAgent(true),
+          openTemplates: () => setShowTemplates(true),
+          applyTemplate,
           setAgentEnabled: (enabled) => bridge.setSettings({ enabled }),
           undoAgent: bridge.undo,
           finishEditing,
@@ -466,6 +481,7 @@ export default function App() {
           onImport={importDoc}
           onReset={resetDoc}
           onHelp={() => setShowWelcome(true)}
+          onTemplates={() => setShowTemplates(true)}
           onAgent={() => setShowAgent(true)}
           agentStatus={bridge.status}
           onCommands={() => setPaletteOpen(true)}
@@ -574,6 +590,10 @@ export default function App() {
           initialEditId={animationsOpen.editId}
           onClose={() => setAnimationsOpen(null)}
         />
+      ) : null}
+
+      {editing && showTemplates ? (
+        <TemplatesDialog onPick={applyTemplate} onClose={() => setShowTemplates(false)} />
       ) : null}
 
       {editing && showAgent ? <AgentDialog bridge={bridge} onClose={() => setShowAgent(false)} /> : null}
