@@ -13,11 +13,14 @@ import { definitionFor } from "../components/library";
 import { renderComponent } from "../components/render";
 import type { CanvasItem, ColorRole, CompNode, ComponentDef, ComponentInstance, Value } from "../components/types";
 import { SOURCE_GROUPS, kindsInGroup, sourceKind } from "../data/registry";
+import type { DataSource } from "../data/types";
 import { useDataStore } from "../data/store";
+import { SourceSettings } from "./DataDialog";
+import { describeRule } from "./AnimationsDialog";
 import { formatValue } from "../data/format";
 import type { FieldDef } from "../data/types";
 import { FONTS, rectFor } from "../lib/board";
-import type { BreakpointKey, Widget, WidgetStyle } from "../lib/types";
+import type { AnimationRule, BreakpointKey, Rect, Screen, Widget, WidgetStyle } from "../lib/types";
 import { Icon, type IconName } from "./icons";
 import { ACCENT_SWATCHES } from "./Toolbar";
 import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
@@ -44,11 +47,20 @@ type Picked = { kind: string; path: string; label: string; source: string };
 type MakerProps = {
   widget: Widget;
   bp: BreakpointKey;
+  screens: Screen[];
+  /** The page's animations, so movement is set up here rather than somewhere else. */
+  animations: AnimationRule[];
   update: (id: string, patch: Partial<Widget>) => void;
+  updateRect: (id: string, patch: Partial<Rect>) => void;
+  updateSource: (id: string, patch: Partial<DataSource>) => void;
   /** Adds the data source for a kind if the dashboard hasn't got one, and returns its id. */
   ensureSource: (kind: string) => string;
+  onEditAnimation: (ruleId: string) => void;
+  onNewAnimation: (widgetId: string) => void;
+  onSaveToLibrary: () => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
   onClose: () => void;
-  onOpenSettings: (tab: "position" | "motion") => void;
 };
 
 export function ComponentMaker(props: MakerProps) {
@@ -66,10 +78,18 @@ export function ComponentMaker(props: MakerProps) {
 function Maker({
   widget,
   bp,
+  screens,
+  animations,
   update,
+  updateRect,
+  updateSource,
   ensureSource,
+  onEditAnimation,
+  onNewAnimation,
+  onSaveToLibrary,
+  onDuplicate,
+  onRemove,
   onClose,
-  onOpenSettings,
   instance,
   def,
 }: MakerProps & { instance: ComponentInstance; def: ComponentDef }) {
@@ -174,19 +194,16 @@ function Maker({
 
   return (
     <Dialog
-      title="Design this component"
-      subtitle={`${def.name} — drag the pieces, then style them below.`}
-      icon="layers"
+      title={widget.title}
+      subtitle={widget.title === def.name ? def.category : def.name}
+      icon={def.icon}
       onClose={onClose}
       width={860}
       footer={
         <>
-          <Button icon="move" onClick={() => onOpenSettings("position")}>
-            Position
-          </Button>
-          <Button icon="sparkles" onClick={() => onOpenSettings("motion")}>
-            Motion
-          </Button>
+          <Button icon="save" title="Save to my components" onClick={onSaveToLibrary} className="px-2.5" />
+          <Button icon="copy" title="Make a copy" onClick={onDuplicate} className="px-2.5" />
+          <Button variant="danger" icon="trash" title="Delete" onClick={onRemove} className="px-2.5" />
           <Button variant="primary" className="flex-1" icon="check" onClick={onClose}>
             Done
           </Button>
@@ -195,27 +212,33 @@ function Maker({
     >
       {/* Toolbar over the canvas, the same shape as the one over the page. */}
       <div className="mb-2 flex flex-wrap items-center gap-1">
-        <ToolButton icon="data" label="Add a value" primary onClick={() => setPicking("new")} disabled={!canvas} />
-        <ToolButton icon="text" label="Text" onClick={() => place({ kind: "text", value: "Text", scale: 1 })} disabled={!canvas} />
-        <ToolButton
-          icon="sun"
-          label="Icon"
-          onClick={() => place({ kind: "icon", value: "sun", scale: 1.6, color: "accent" }, { w: 0.22, h: 0.22 })}
-          disabled={!canvas}
-        />
-        <ToolButton
-          icon="image"
-          label="Picture"
-          onClick={() => place({ kind: "image", value: "", grow: true, fit: "cover" }, { w: 0.4, h: 0.4 })}
-          disabled={!canvas}
-        />
-        <ToolButton
-          icon="gauge"
-          label="Bar"
-          onClick={() => place({ kind: "bar", value: "50", max: "100", color: "accent" }, { h: 0.08 })}
-          disabled={!canvas}
-        />
-        <ToolButton icon="layers" label="Line" onClick={() => place({ kind: "divider" }, { h: 0.06 })} disabled={!canvas} />
+        {canvas ? (
+          <>
+            <ToolButton icon="data" label="Add a value" primary onClick={() => setPicking("new")} />
+            <ToolButton icon="text" label="Text" onClick={() => place({ kind: "text", value: "Text", scale: 1 })} />
+            <ToolButton
+              icon="sun"
+              label="Icon"
+              onClick={() => place({ kind: "icon", value: "sun", scale: 1.6, color: "accent" }, { w: 0.22, h: 0.22 })}
+            />
+            <ToolButton
+              icon="image"
+              label="Picture"
+              onClick={() => place({ kind: "image", value: "", grow: true, fit: "cover" }, { w: 0.4, h: 0.4 })}
+            />
+            <ToolButton icon="gauge" label="Bar" onClick={() => place({ kind: "bar", value: "50", max: "100", color: "accent" }, { h: 0.08 })} />
+            <ToolButton icon="layers" label="Line" onClick={() => place({ kind: "divider" }, { h: 0.06 })} />
+          </>
+        ) : (
+          <ToolButton
+            icon="move"
+            label="Rearrange it yourself"
+            onClick={() => {
+              setTree(convertToCanvas(tree, measureRef.current));
+              setSelected(null);
+            }}
+          />
+        )}
       </div>
 
       {/* The card at its real shape, with the pieces on it. */}
@@ -338,25 +361,14 @@ function Maker({
       </div>
 
       {!canvas ? (
-        <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="mb-2 text-[12.5px] leading-relaxed text-white/60">
-            This design arranges itself to fit whatever size you give it. Take control to drag its pieces around freely —
-            good for a look of your own, though it stops reflowing by itself afterwards.
-          </p>
-          <Button
-            icon="move"
-            onClick={() => {
-              setTree(convertToCanvas(tree, measureRef.current));
-              setSelected(null);
-            }}
-          >
-            Take control of the layout
-          </Button>
-        </div>
+        <p className="mb-4 text-[12px] leading-relaxed text-white/45">
+          This design arranges itself to fit any size. Rearranging it yourself lets you drag its pieces around, but it
+          stops reflowing on its own.
+        </p>
       ) : null}
 
       {item && canvas ? (
-        <Section title="This piece" hint="Only this piece changes. Leave a setting alone and it follows the whole component.">
+        <Section title="This piece" hint="Anything you leave alone follows the component.">
           <PieceSettings
             item={item}
             onChange={(node) => setTree(updateItemNode(canvas, item.id, node))}
@@ -366,7 +378,49 @@ function Maker({
         </Section>
       ) : null}
 
-      <Section title="The whole component" hint="Everything inside follows these, unless it has a setting of its own.">
+      {def.needs.length ? (
+        <Section title="Data">
+          {def.needs.map((need) => {
+            const id = instance.sources[need.key];
+            const source = store.sources.find((s) => s.id === id);
+            const options = store.sources.filter((s) => s.kind === need.kind);
+            return (
+              <div key={need.key} className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                {options.length > 1 ? (
+                  <Field label={need.label} stacked>
+                    <select
+                      className={inputClass}
+                      value={id ?? ""}
+                      onChange={(e) => setInstance({ sources: { ...instance.sources, [need.key]: e.target.value } })}
+                    >
+                      {options.map((o) => (
+                        <option key={o.id} value={o.id} className="bg-[#1b1928]">
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+                {source ? (
+                  <SourceSettings source={source} update={(patch) => updateSource(source.id, patch)} />
+                ) : (
+                  <Button
+                    icon="data"
+                    onClick={() => {
+                      const created = ensureSource(need.kind);
+                      if (created) setInstance({ sources: { ...instance.sources, [need.key]: created } });
+                    }}
+                  >
+                    Set up {need.label.toLowerCase()}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </Section>
+      ) : null}
+
+      <Section title="Look" hint="Everything inside follows these unless it has its own.">
         <Field label="Background" stacked>
           <ColorField
             value={style.bg}
@@ -426,7 +480,7 @@ function Maker({
       </Section>
 
       {(def.params ?? []).length ? (
-        <Section title="Settings" hint="Options this design offers.">
+        <Section title="Options">
           {(def.params ?? []).map((p) => {
             const value = instance.params[p.key] ?? p.default;
             return (
@@ -457,6 +511,52 @@ function Maker({
           })}
         </Section>
       ) : null}
+
+      <Section title="Size & position" hint={`On the ${(screens.find((s) => s.key === bp) ?? screens[screens.length - 1]).label.toLowerCase()} screen only.`}>
+        <div className="mb-3 grid grid-cols-4 gap-2">
+          {(["x", "y", "w", "h"] as const).map((key) => (
+            <label key={key} className="text-[12px]">
+              <span className="mb-1 block text-white/55">{{ x: "Left", y: "Top", w: "Width", h: "Height" }[key]}</span>
+              <input
+                type="number"
+                className={inputClass}
+                value={Math.round(rect[key])}
+                onChange={(e) => updateRect(widget.id, { [key]: Number(e.target.value) })}
+              />
+            </label>
+          ))}
+        </div>
+        <Field label="Hide on this screen">
+          <Toggle checked={rect.hidden} onChange={(hidden) => updateRect(widget.id, { hidden })} label="Hide on this screen" />
+        </Field>
+        <Field label="Lock in place" help="Stops it being dragged or deleted by accident.">
+          <Toggle checked={widget.locked} onChange={(locked) => update(widget.id, { locked })} label="Lock in place" />
+        </Field>
+        <Field label="Show its name" help="Puts the name at the top of the card as a small heading.">
+          <Toggle checked={widget.showTitle} onChange={(showTitle) => update(widget.id, { showTitle })} label="Show its name" />
+        </Field>
+      </Section>
+
+      <Section title="Movement">
+        {animations.length ? (
+          <div className="mb-2 overflow-hidden rounded-xl border border-white/10">
+            {animations.map((rule) => (
+              <button
+                key={rule.id}
+                onClick={() => onEditAnimation(rule.id)}
+                className="flex w-full items-center gap-2 border-b border-white/[0.06] px-2.5 py-2 text-left text-[12.5px] transition last:border-0 hover:bg-white/[0.08]"
+              >
+                <Icon name="sparkles" size={13} className="shrink-0 text-[var(--accent)]" />
+                <span className="min-w-0 flex-1 truncate">{rule.name}</span>
+                <span className="shrink-0 truncate text-[11px] text-white/45">{describeRule(rule, [widget])}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <Button icon="sparkles" className="w-full" onClick={() => onNewAnimation(widget.id)}>
+          {animations.length ? "Add another movement" : "Make this move"}
+        </Button>
+      </Section>
 
       {picking ? <VariableSheet onPick={useVariable} onClose={() => setPicking(null)} /> : null}
     </Dialog>
@@ -514,17 +614,30 @@ function PieceSettings({
 
       {node.kind === "text" || node.kind === "icon" || node.kind === "bar" ? (
         <Field label="Colour" stacked>
-          <Segmented
-            size="sm"
-            value={(node.color ?? "text") as ColorRole}
-            onChange={(color) => patch({ color, ...(node.kind === "bar" ? {} : { tint: undefined }) } as Partial<CompNode>)}
-            options={COLOR_CHOICES}
-          />
-          {node.kind !== "bar" ? (
-            <div className="mt-2">
-              <ColorField value={node.tint ?? "#ffffff"} onChange={(tint) => patch({ tint } as Partial<CompNode>)} swatches={ACCENT_SWATCHES} />
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {COLOR_CHOICES.map((c) => {
+              const active = !("tint" in node && node.tint) && (node.color ?? "text") === c.value;
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => patch({ color: c.value, tint: undefined } as Partial<CompNode>)}
+                  className={`rounded-lg px-2.5 py-1 text-[12px] transition ${active ? "bg-[var(--accent)] font-medium text-[var(--accent-ink)]" : "bg-white/[0.07] text-white/70 hover:bg-white/15"}`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+            {node.kind !== "bar" ? (
+              <input
+                type="color"
+                aria-label="A colour of your own"
+                title="A colour of your own"
+                value={"tint" in node && node.tint ? node.tint : "#ffffff"}
+                onChange={(e) => patch({ tint: e.target.value } as Partial<CompNode>)}
+                className="h-7 w-9 cursor-pointer rounded-lg border border-white/15 bg-transparent"
+              />
+            ) : null}
+          </div>
         </Field>
       ) : null}
 

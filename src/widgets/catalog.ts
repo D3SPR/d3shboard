@@ -12,7 +12,11 @@ export const WIDGET_CATALOG: { type: WidgetType; label: string; description: str
   { type: "component", label: "Component", description: "A ready-made design from the component library.", icon: "layers" },
 ];
 
-/** The simple building blocks, shown under "Basics" in the Add dialog. */
-export const ADDABLE_CATALOG = WIDGET_CATALOG.filter((c) => c.type !== "component");
+/**
+ * Shown under "Basics". Clocks, notes, headlines and live numbers are left out on
+ * purpose: the library has better versions, and two of everything was confusing.
+ * Existing dashboards keep any of these they already have.
+ */
+export const ADDABLE_CATALOG = WIDGET_CATALOG.filter((c) => ["image", "iframe", "embed"].includes(c.type));
 
 export const catalogEntry = (type: WidgetType) => WIDGET_CATALOG.find((c) => c.type === type)!;

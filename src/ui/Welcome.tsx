@@ -4,12 +4,10 @@ import { Icon, Logo, type IconName } from "./icons";
 import { Button, Dialog } from "./kit";
 
 const STEPS: { icon: IconName; title: string; text: string }[] = [
-  { icon: "plus", title: "Add things", text: "Press Add to drop in clocks, notes, news, pictures, live numbers and more." },
-  { icon: "move", title: "Move and resize", text: "Drag anything to move it. Tap it once, then pull the dots on its corners to resize." },
-  { icon: "pencil", title: "Change anything", text: "Tap the round pencil button (or double-click) on a component to change what it shows and how it looks." },
-  { icon: "palette", title: "Set the mood", text: "Theme changes the colours, font and background of the whole page." },
-  { icon: "sparkles", title: "Bring it to life", text: "Animate makes things move. Automations change things by themselves, like a dark theme at night." },
-  { icon: "eye", title: "Show it off", text: "Press Done to see your finished dashboard. Tap the pencil in the bottom corner to edit again." },
+  { icon: "plus", title: "Add", text: "Weather, headlines, scores, clocks — they arrive already working." },
+  { icon: "move", title: "Arrange", text: "Drag to move. Tap once, then pull the corner dots to resize." },
+  { icon: "pencil", title: "Change", text: "Tap the pencil on anything to change what it shows and how it looks." },
+  { icon: "eye", title: "Done", text: "See your finished dashboard. The pencil in the corner brings you back." },
 ];
 
 export function Welcome({ onClose }: { onClose: () => void }) {
@@ -48,10 +46,8 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         ))}
       </ol>
       <p className="mt-3 text-center text-[12px] text-white/40">
-        Stuck? Look for the little <span className="rounded-full border border-white/30 px-1">?</span> buttons, or press Help at the top.
-      </p>
-      <p className="mt-1 text-center text-[12px] text-white/40">
-        In a hurry? Press <kbd className="rounded border border-white/20 px-1 text-white/60">{PALETTE_SHORTCUT}</kbd> to do anything by typing.
+        Stuck? Look for the <span className="rounded-full border border-white/30 px-1">?</span> buttons. Press{" "}
+        <kbd className="rounded border border-white/20 px-1 text-white/60">{PALETTE_SHORTCUT}</kbd> to do anything by typing.
       </p>
     </Dialog>
   );

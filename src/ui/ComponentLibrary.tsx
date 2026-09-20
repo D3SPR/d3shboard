@@ -86,10 +86,7 @@ export function LibraryPanel({
 
   return (
     <>
-      <Intro>
-        Pick one and it lands on your page, already showing real data. Everything about it can be changed afterwards — or
-        deleted, if you change your mind.
-      </Intro>
+      <Intro>Pick one and it lands on your page showing real data. Everything about it can be changed after.</Intro>
 
       <div className="sticky -top-4 z-10 -mx-4 mb-3 bg-[var(--chrome)] px-4 pb-2">
         <input
@@ -186,9 +183,7 @@ export function LibraryPanel({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-            Simple building blocks you fill in yourself. Drag one to drop it exactly where you want it.
-          </p>
+          <p className="mt-2 text-[12px] text-white/45">Drag one to drop it exactly where you want it.</p>
         </div>
       ) : null}
 

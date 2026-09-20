@@ -22,10 +22,7 @@ export function ThemesDialog({
       onClose={onClose}
       width={620}
     >
-      <Intro>
-        Themes only change how this page looks, never what's on it. Pick another one any time, or fine-tune everything
-        afterwards in the Theme menu.
-      </Intro>
+      <Intro>Themes change how this page looks, never what's on it.</Intro>
 
       <Field
         label="Restyle the components too"

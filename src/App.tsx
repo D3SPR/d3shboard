@@ -863,15 +863,6 @@ export default function App() {
           }}
           onNewAnimation={openNewAnimation}
           initialTab={editorTab}
-          onOpenData={() => {
-            setEditingWidgetId(null);
-            setAddTab("data");
-          }}
-          onDesign={() => {
-            setEditingWidgetId(null);
-            setMakerWidgetId(editingWidget.id);
-          }}
-          onSaveToLibrary={() => saveComponent(editingWidget.id)}
         />
       ) : null}
 
@@ -879,14 +870,35 @@ export default function App() {
         <ComponentMaker
           widget={makerWidget}
           bp={bp}
+          screens={screens}
+          animations={panel.animations.filter(
+            (a) => a.target.widgetId === makerWidget.id || ("widgetId" in a.trigger && a.trigger.widgetId === makerWidget.id),
+          )}
           update={updateWidget}
+          updateRect={updateRect}
+          updateSource={(id, patch) =>
+            setDoc((d) => ({ ...d, sources: d.sources.map((s) => (s.id === id ? { ...s, ...patch } : s)) }))
+          }
           ensureSource={ensureSource}
-          onClose={() => setMakerWidgetId(null)}
-          onOpenSettings={(tab) => {
+          onEditAnimation={(ruleId) => {
             setMakerWidgetId(null);
-            setEditorTab(tab === "position" ? "position" : "motion");
-            setEditingWidgetId(makerWidget.id);
+            setAnimationsOpen({ editId: ruleId });
           }}
+          onNewAnimation={(id) => {
+            setMakerWidgetId(null);
+            openNewAnimation(id);
+          }}
+          onSaveToLibrary={() => saveComponent(makerWidget.id)}
+          onDuplicate={() => {
+            duplicateWidget(makerWidget.id);
+            setMakerWidgetId(null);
+          }}
+          onRemove={() => {
+            if (!confirm(`Delete “${makerWidget.title}”?`)) return;
+            deleteWithUndo(makerWidget.id);
+            setMakerWidgetId(null);
+          }}
+          onClose={() => setMakerWidgetId(null)}
         />
       ) : null}
 

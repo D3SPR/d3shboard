@@ -11,10 +11,7 @@ export function TemplatesDialog({ onPick, onClose }: { onPick: (templateId: stri
       onClose={onClose}
       width={560}
     >
-      <Intro>
-        Each one is added as a new page, so nothing you already have is touched. Everything on it can be moved, restyled or
-        deleted afterwards.
-      </Intro>
+      <Intro>Each one is added as a new page, so nothing you already have is touched.</Intro>
       <div className="grid gap-2 sm:grid-cols-2">
         {TEMPLATES.map((t) => (
           <button

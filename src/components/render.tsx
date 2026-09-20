@@ -311,6 +311,13 @@ const flatInput: CSSProperties = {
   resize: "none",
 };
 
+/**
+ * Previews and library cards are themselves buttons, so the interactive pieces render
+ * as plain text there — a button inside a button is invalid, and a preview shouldn't
+ * be clickable anyway. They come alive once the component is on a page.
+ */
+const inert = (ctx: Ctx) => !ctx.widgetId;
+
 function FieldNode({ node, ctx }: { node: Extract<CompNode, { kind: "field" }>; ctx: Ctx }) {
   const setParam = useSetParam(ctx);
   const value = String(ctx.params[node.param] ?? "");
@@ -324,6 +331,9 @@ function FieldNode({ node, ctx }: { node: Extract<CompNode, { kind: "field" }>; 
     flex: node.grow ? "1 1 auto" : undefined,
     minHeight: node.grow ? "2.5em" : undefined,
   };
+  if (inert(ctx))
+    return <div style={{ ...style, whiteSpace: "pre-wrap" }}>{value || node.placeholder || ""}</div>;
+
   const props = {
     value,
     placeholder: node.placeholder,
@@ -358,17 +368,18 @@ function StepperNode({ node, ctx }: { node: Extract<CompNode, { kind: "stepper" 
     cursor: "pointer",
     flexShrink: 0,
   };
+  const Tap = inert(ctx) ? "span" : "button";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.5em", justifyContent: "center" }}>
-      <button type="button" aria-label="Less" style={button} onClick={() => nudge(-step)}>
+      <Tap aria-label="Less" style={button} onClick={() => nudge(-step)}>
         −
-      </button>
+      </Tap>
       <span style={{ fontSize: `${SIZES[node.size ?? "xl"]}em`, fontWeight: 700, minWidth: "2em", textAlign: "center" }}>
         {formatValue(value, "number", { unit: node.unit })}
       </span>
-      <button type="button" aria-label="More" style={button} onClick={() => nudge(step)}>
+      <Tap aria-label="More" style={button} onClick={() => nudge(step)}>
         +
-      </button>
+      </Tap>
     </div>
   );
 }
@@ -391,10 +402,11 @@ function ChecklistNode({ node, ctx }: { node: Extract<CompNode, { kind: "checkli
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.45em", fontSize: `${size}em`, minHeight: 0, overflow: "auto" }}>
-      {shown.map((item, i) => (
-        <button
+      {shown.map((item, i) => {
+        const Row = inert(ctx) ? "span" : "button";
+        return (
+        <Row
           key={`${item.text}-${i}`}
-          type="button"
           onClick={() => toggle(i)}
           style={{
             display: "flex",
@@ -427,8 +439,9 @@ function ChecklistNode({ node, ctx }: { node: Extract<CompNode, { kind: "checkli
             {item.done ? "✓" : ""}
           </span>
           <span style={{ opacity: item.done ? 0.45 : 1, textDecoration: item.done ? "line-through" : "none" }}>{item.text}</span>
-        </button>
-      ))}
+        </Row>
+        );
+      })}
       {ctx.widgetId ? (
         <input
           placeholder={node.placeholder ?? "Add something…"}
@@ -460,9 +473,9 @@ function ButtonNode({ node, ctx }: { node: Extract<CompNode, { kind: "button" }>
     if (node.action === "add") setParam(node.param, (prev) => (Number(prev ?? 0) || 0) + (node.amount ?? 1));
   };
 
+  const Tap = inert(ctx) ? "span" : "button";
   return (
-    <button
-      type="button"
+    <Tap
       onClick={run}
       style={{
         display: "inline-flex",
@@ -483,7 +496,7 @@ function ButtonNode({ node, ctx }: { node: Extract<CompNode, { kind: "button" }>
     >
       {node.icon ? <Icon name={node.icon} style={{ width: "1.1em", height: "1.1em" }} /> : null}
       {node.label}
-    </button>
+    </Tap>
   );
 }
 

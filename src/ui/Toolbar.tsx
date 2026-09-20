@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { BRAND } from "../brand";
 import { FONTS } from "../lib/board";
 import type { Background, BreakpointKey, Panel, RenderBoard, Screen } from "../lib/types";
@@ -7,7 +7,7 @@ import { PALETTE_SHORTCUT } from "../commands/shortcut";
 import { Icon, Logo, type IconName } from "./icons";
 import { Button, ColorField, Disclosure, Field, Intro, Popover, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
 
-export type MenuId = "theme" | "screen" | "pages" | "file";
+export type MenuId = "theme" | "screen" | "pages" | "more";
 
 export const NAMED_ACCENTS = [
   { name: "Lavender", color: "#c7b8ff" },
@@ -107,7 +107,7 @@ export function Toolbar(props: Props) {
     theme: useRef<HTMLButtonElement>(null),
     screen: useRef<HTMLButtonElement>(null),
     pages: useRef<HTMLButtonElement>(null),
-    file: useRef<HTMLButtonElement>(null),
+    more: useRef<HTMLButtonElement>(null),
   };
 
   useEffect(() => {
@@ -147,14 +147,13 @@ export function Toolbar(props: Props) {
         <ToolButton icon="palette" label="Theme" active={open === "theme"} onClick={() => toggle("theme")} buttonRef={anchors.theme} title="Colours, font and background" />
         <ToolButton icon={bpIcon} label={bpInfo.label} active={open === "screen"} onClick={() => toggle("screen")} buttonRef={anchors.screen} title="Choose which screen size you're arranging" />
         <ToolButton icon="pages" label="Pages" active={open === "pages"} onClick={() => toggle("pages")} buttonRef={anchors.pages} title="Add or switch between pages" />
-        <ToolButton icon="sparkles" label="Animate" onClick={() => { close(); props.onAnimations(); }} title="Make things move" />
-        <ToolButton icon="zap" label="Automations" onClick={() => { close(); props.onAutomations(); }} title="Change things automatically, e.g. at night" />
-        <ToolButton icon="save" label="Backup" active={open === "file"} onClick={() => toggle("file")} buttonRef={anchors.file} title="Save a copy, load one, or start over" />
         <ToolButton
-          icon="bot"
-          label="Agent"
-          onClick={() => { close(); props.onAgent(); }}
-          title="Let an AI agent build your dashboard"
+          icon="layers"
+          label="More"
+          active={open === "more"}
+          onClick={() => toggle("more")}
+          buttonRef={anchors.more}
+          title="Movement, automatic changes, backups, agents and help"
           dot={
             props.agentStatus === "connected"
               ? "#7cf5c4"
@@ -165,7 +164,6 @@ export function Toolbar(props: Props) {
                   : undefined
           }
         />
-        <ToolButton icon="help" label="Help" onClick={() => { close(); props.onHelp(); }} title="How does this work?" />
       </div>
 
       <button
@@ -196,12 +194,8 @@ export function Toolbar(props: Props) {
       <Popover anchor={anchors.pages} open={open === "pages"} width={320}>
         <PagesMenu {...props} close={close} />
       </Popover>
-      <Popover anchor={anchors.file} open={open === "file"} width={290}>
-        <BackupMenu
-          onExport={() => { props.onExport(); close(); }}
-          onImport={() => { props.onImport(); close(); }}
-          onReset={() => { props.onReset(); close(); }}
-        />
+      <Popover anchor={anchors.more} open={open === "more"} width={300}>
+        <MoreMenu {...props} close={close} />
       </Popover>
     </header>
   );
@@ -212,7 +206,7 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
   const setBg = (patch: Partial<Background>) => setBoard({ background: { ...bg, ...patch } });
   return (
     <>
-      <Intro>How this page looks. Changes apply to the page you're on.</Intro>
+      <Intro>How this page looks.</Intro>
 
       <Button variant="primary" icon="palette" className="mb-4 w-full" onClick={onThemes}>
         Start from a theme
@@ -337,10 +331,7 @@ function ScreenMenu({
   const iconFor = (s: Screen): IconName => (s.width < 600 ? "phone" : s.width < 1100 ? "tablet" : "computer");
   return (
     <>
-      <Intro>
-        Your dashboard is arranged separately for each screen size here, and picks the closest one when it's shown. Pick
-        which you're arranging now.
-      </Intro>
+      <Intro>Each screen size is arranged separately. Your dashboard picks the closest one when it's shown.</Intro>
       {screens.map((b) => (
         <div
           key={b.key}
@@ -386,8 +377,8 @@ function ScreenMenu({
         Add this window size
       </Button>
       <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-        Adding one copies the closest layout you already have, then you rearrange it. Moving or resizing only affects the
-        screen picked here; content and styling stay the same everywhere.
+        A new one starts from your closest layout. Moving things only affects the screen picked here — what they show
+        stays the same everywhere.
       </p>
     </>
   );
@@ -397,7 +388,7 @@ function PagesMenu(props: Props & { close: () => void }) {
   const { panels, activePanelId } = props;
   return (
     <>
-      <Intro>Pages are separate screens in your dashboard. When viewing, swipe or use the arrow keys to flip between them.</Intro>
+      <Intro>Separate screens in your dashboard. Swipe or use the arrow keys to flip between them.</Intro>
       <Button
         icon="sparkles"
         className="mb-3 w-full"
@@ -458,10 +449,13 @@ function PagesMenu(props: Props & { close: () => void }) {
   );
 }
 
-function BackupMenu({ onExport, onImport, onReset }: { onExport: () => void; onImport: () => void; onReset: () => void }) {
-  const Row = ({ icon, title, text, onClick, danger }: { icon: IconName; title: string; text: ReactNode; onClick: () => void; danger?: boolean }) => (
+function MoreMenu(props: Props & { close: () => void }) {
+  const Row = ({ icon, title, text, onClick, danger }: { icon: IconName; title: string; text: string; onClick: () => void; danger?: boolean }) => (
     <button
-      onClick={onClick}
+      onClick={() => {
+        props.close();
+        onClick();
+      }}
       className={`mb-1.5 flex w-full items-start gap-3 rounded-xl border p-2.5 text-left transition ${danger ? "border-red-400/20 hover:bg-red-500/10" : "border-white/10 hover:bg-white/10"}`}
     >
       <span className={`mt-0.5 ${danger ? "text-red-300" : "text-[var(--accent)]"}`}>
@@ -475,10 +469,14 @@ function BackupMenu({ onExport, onImport, onReset }: { onExport: () => void; onI
   );
   return (
     <>
-      <Intro>Everything saves automatically in this browser. Use a backup to keep a copy safe or move your dashboard to another device.</Intro>
-      <Row icon="save" title="Download a backup" text="Saves your whole dashboard as a small file." onClick={onExport} />
-      <Row icon="copy" title="Load a backup" text="Replaces this dashboard with one from a backup file." onClick={onImport} />
-      <Row icon="trash" title="Start over" text="Wipes everything and goes back to the starter dashboard." onClick={onReset} danger />
+      <Row icon="sparkles" title="Movement" text="Make things appear, pulse or react." onClick={props.onAnimations} />
+      <Row icon="zap" title="Automatic changes" text="Switch pages or colours at a time of day." onClick={props.onAutomations} />
+      <Row icon="bot" title="AI agent" text="Let an agent build your dashboard for you." onClick={props.onAgent} />
+      <Row icon="help" title="How this works" text="A short tour of the basics." onClick={props.onHelp} />
+      <div className="my-2 border-t border-white/10" />
+      <Row icon="save" title="Download a backup" text="Your whole dashboard as a small file." onClick={props.onExport} />
+      <Row icon="copy" title="Load a backup" text="Replaces this dashboard with a saved one." onClick={props.onImport} />
+      <Row icon="trash" title="Start over" text="Wipes everything and starts fresh." onClick={props.onReset} danger />
     </>
   );
 }

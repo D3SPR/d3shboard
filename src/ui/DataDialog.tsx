@@ -85,14 +85,12 @@ function PlaceField({ params, patch }: { params: SourceParams; patch: (p: Source
           ))}
         </div>
       ) : null}
-      <p className="mt-1.5 text-[12px] leading-relaxed text-white/45">
-        Searching a place fills in the exact spot for you. Nothing leaves your browser except the weather request itself.
-      </p>
+      <p className="mt-1.5 text-[12px] text-white/45">Searching fills in the exact spot for you.</p>
     </div>
   );
 }
 
-function ParamField({
+export function ParamField({
   def,
   params,
   patch,
@@ -159,6 +157,30 @@ function ParamField({
   );
 }
 
+/** A source's own settings — which league, which place, which feed — wherever they're needed. */
+export function SourceSettings({
+  source,
+  update,
+}: {
+  source: DataSource;
+  update: (patch: Partial<DataSource>) => void;
+}) {
+  const kind = sourceKind(source.kind);
+  if (!kind?.params.length) return null;
+  return (
+    <>
+      {kind.params.map((p) => (
+        <ParamField
+          key={p.key}
+          def={p}
+          params={source.params}
+          patch={(patch) => update({ params: { ...source.params, ...patch } })}
+        />
+      ))}
+    </>
+  );
+}
+
 function SourceCard({
   source,
   store,
@@ -207,14 +229,7 @@ function SourceCard({
 
       {kind.params.length ? (
         <div className="mt-3 border-t border-white/10 pt-3">
-          {kind.params.map((p) => (
-            <ParamField
-              key={p.key}
-              def={p}
-              params={source.params}
-              patch={(patch) => update({ params: { ...source.params, ...patch } })}
-            />
-          ))}
+          <SourceSettings source={source} update={update} />
         </div>
       ) : null}
 
@@ -252,10 +267,7 @@ export function DataPanel({
 }) {
   return (
     <>
-      <Intro>
-        This is the live information your components are showing. Everything here updates by itself — change where it
-        points and every component using it follows.
-      </Intro>
+      <Intro>The live information your components are showing. Change where it points and they all follow.</Intro>
 
       {sources.map((s) => (
         <SourceCard
@@ -270,8 +282,8 @@ export function DataPanel({
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
         <p className="text-[12.5px] leading-relaxed text-white/60">
           {sources.length
-            ? "Data arrives when you add a component that shows it — from the Components tab, or by dropping a value into a component you're designing. Nothing is kept here that nothing is using."
-            : "Nothing yet. Add a component from the Components tab, or design one and drop a value into it, and the data it needs appears here ready to point wherever you like."}
+            ? "Data appears here when you add a component that shows it, and leaves when nothing does."
+            : "Nothing yet. Add a component and the data it needs appears here."}
         </p>
       </div>
     </>
