@@ -106,7 +106,11 @@ export default function App() {
             ...p,
             widgets: p.widgets.map((w) => {
               if (w.id !== widgetId || !w.component) return w;
-              const next = typeof value === "function" ? value(w.component.params[key]) : value;
+              // Until it's been changed once, a setting only exists as the design's
+              // default — so that's what a change has to build on, not nothing.
+              const fallback = definitionFor(w.component.defId)?.params?.find((p) => p.key === key)?.default;
+              const previous = w.component.params[key] ?? fallback;
+              const next = typeof value === "function" ? value(previous) : value;
               return { ...w, component: { ...w.component, params: { ...w.component.params, [key]: next } } };
             }),
           })),
