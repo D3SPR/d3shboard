@@ -513,8 +513,8 @@ function VariableSheet({ onPick, onClose }: { onPick: (picked: Picked) => void; 
   const [query, setQuery] = useState("");
 
   const all = useMemo(() => {
-    const out: (Picked & { live: string | null })[] = [];
-    const push = (kindKey: string, sourceName: string, field: FieldDef, prefix = "", parent?: FieldDef) => {
+    const out: (Picked & { live: string | null; terms: string })[] = [];
+    const push = (kindKey: string, sourceName: string, terms: string, field: FieldDef, prefix = "", parent?: FieldDef) => {
       const source = store.sources.find((s) => s.kind === kindKey);
       const raw = source ? store.states[source.id]?.value?.[field.key] : undefined;
       const live =
@@ -529,14 +529,20 @@ function VariableSheet({ onPick, onClose }: { onPick: (picked: Picked) => void; 
         label: parent ? `${parent.label} → first → ${field.label}` : field.label,
         source: sourceName,
         live,
+        terms,
       });
     };
     for (const group of SOURCE_GROUPS) {
       for (const kind of kindsInGroup(group)) {
         const name = store.sources.find((s) => s.kind === kind.kind)?.name ?? kind.label;
+        // Searching works on what people actually type — "bitcoin", "NBA", "AAPL" —
+        // so each value carries its source's description and example settings too.
+        const terms = [kind.label, kind.kind, kind.description, group, ...kind.params.map((p) => `${p.label} ${p.default} ${(p.options ?? []).map((o) => o.label).join(" ")}`)]
+          .join(" ")
+          .toLowerCase();
         for (const field of kind.fields) {
-          push(kind.kind, name, field);
-          for (const child of field.of ?? []) push(kind.kind, name, child, `${field.key}.0.`, field);
+          push(kind.kind, name, terms, field);
+          for (const child of field.of ?? []) push(kind.kind, name, terms, child, `${field.key}.0.`, field);
         }
       }
     }
@@ -544,7 +550,9 @@ function VariableSheet({ onPick, onClose }: { onPick: (picked: Picked) => void; 
   }, [store.sources, store.states]);
 
   const q = query.trim().toLowerCase();
-  const shown = q ? all.filter((v) => `${v.source} ${v.label}`.toLowerCase().includes(q)) : all.filter((v) => !v.path.includes(".0."));
+  const shown = q
+    ? all.filter((v) => `${v.source} ${v.label}`.toLowerCase().includes(q) || v.terms.includes(q))
+    : all.filter((v) => !v.path.includes(".0."));
   const inUse = new Set(store.sources.map((s) => s.kind));
 
   return (
