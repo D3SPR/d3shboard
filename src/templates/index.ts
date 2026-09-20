@@ -1,20 +1,26 @@
-import { createPanel, createWidget, uid } from "../lib/board";
-import type { BreakpointKey, Panel, WidgetConfig, WidgetStyle, WidgetType } from "../lib/types";
+import { definitionFor } from "../components/library";
+import { createComponentWidget, createPanel, createWidget, uid } from "../lib/board";
+import { createSource } from "../data/registry";
+import type { DataSource } from "../data/types";
+import type { BreakpointKey, Panel, Rect, Widget, WidgetConfig, WidgetStyle, WidgetType } from "../lib/types";
 import type { IconName } from "../ui/icons";
-import { SPORTS_PANEL, WEATHER_PANEL } from "./panels";
 
 type Box = [x: number, y: number, w: number, h: number];
 
+/** A template's own data sources, so "Sports night" can use a sports feed for its headlines. */
+type SourceSpec = { key: string; kind: string; name?: string; params?: Record<string, string> };
+
 type Spec = {
-  type: WidgetType;
   title: string;
   showTitle?: boolean;
-  config?: WidgetConfig;
   style?: Partial<WidgetStyle>;
   computer: Box;
   tablet: Box;
   phone: Box;
-};
+} & (
+  | { component: string; settings?: Record<string, string | number>; use?: Record<string, string>; type?: never; config?: never }
+  | { type: WidgetType; config?: WidgetConfig; component?: never }
+);
 
 export type Template = {
   id: string;
@@ -22,6 +28,7 @@ export type Template = {
   description: string;
   icon: IconName;
   theme: Partial<Panel>;
+  sources?: SourceSpec[];
   widgets: Spec[];
   popIn?: boolean;
 };
@@ -44,19 +51,9 @@ const INK = {
   background: { kind: "gradient", color: "#0b0a12", color2: "#221a3a", angle: 145, imageUrl: "", imageFit: "cover", dim: 0 },
 } as const;
 
-// Panels keep their own text size so lists stay readable; clocks scale with their box.
-const panel: Partial<WidgetStyle> = {
-  autoFit: false,
-  align: "left",
-  fontSize: 15,
-  padding: 16,
-  bg: "#0c1726d9",
-  border: "#ffffff1f",
-  radius: 16,
-  shadow: "soft",
-  blur: true,
-};
 const card: Partial<WidgetStyle> = { bg: "#0c1726d9", border: "#ffffff1f", radius: 16, shadow: "soft", blur: true };
+const plum: Partial<WidgetStyle> = { ...card, bg: "#1a0f18d9" };
+const violet: Partial<WidgetStyle> = { ...card, bg: "#12101dcc" };
 
 const FEEDS = {
   nytTop: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
@@ -75,136 +72,97 @@ export const TEMPLATES: Template[] = [
     icon: "pages",
     theme: NIGHT,
     popIn: true,
+    sources: [{ key: "top", kind: "news", name: "Top stories", params: { url: FEEDS.nytTop } }],
     widgets: [
+      { component: "time.big", title: "Clock", style: card, computer: [40, 40, 420, 200], tablet: [20, 20, 380, 150], phone: [20, 14, 350, 120] },
+      { component: "weather.now", title: "Weather", style: card, computer: [480, 40, 440, 200], tablet: [420, 20, 380, 150], phone: [20, 146, 350, 160] },
       {
-        type: "clock",
-        title: "Clock",
-        showTitle: false,
-        config: { format: "h:mm A", sub: "dddd, DD MMMM", timezone: "" },
-        style: card,
-        computer: [40, 40, 420, 200],
-        tablet: [20, 20, 380, 150],
-        phone: [20, 14, 350, 110],
-      },
-      {
-        type: "embed",
-        title: "Weather",
-        showTitle: true,
-        config: { html: WEATHER_PANEL },
-        style: panel,
-        computer: [480, 40, 460, 200],
-        tablet: [420, 20, 380, 150],
-        phone: [20, 134, 350, 150],
-      },
-      {
-        type: "embed",
+        component: "sports.live",
         title: "Live & upcoming",
         showTitle: true,
-        config: { html: SPORTS_PANEL },
-        style: panel,
+        settings: { count: 4 },
+        style: card,
         computer: [960, 40, 440, 620],
-        tablet: [20, 190, 780, 240],
-        phone: [20, 294, 350, 200],
+        tablet: [20, 190, 780, 230],
+        phone: [20, 318, 350, 190],
       },
       {
-        type: "feed",
+        component: "news.list",
         title: "Top stories",
         showTitle: true,
-        config: { url: FEEDS.nytTop, count: 9, refresh: 15 },
-        style: panel,
+        use: { news: "top" },
+        settings: { count: 8 },
+        style: card,
         computer: [40, 260, 880, 400],
-        tablet: [20, 450, 780, 230],
-        phone: [20, 504, 350, 190],
+        tablet: [20, 440, 780, 240],
+        phone: [20, 520, 350, 190],
       },
     ],
   },
   {
     id: "morning",
     name: "Morning check-in",
-    description: "Big clock, the weather, your plan for the day and the headlines.",
+    description: "A greeting, the weather in detail, your plan for the day and the headlines.",
     icon: "clock",
     theme: DUSK,
     popIn: true,
     widgets: [
-      {
-        type: "clock",
-        title: "Clock",
-        showTitle: false,
-        config: { format: "h:mm", sub: "dddd, DD MMMM", timezone: "" },
-        style: card,
-        computer: [40, 40, 560, 240],
-        tablet: [20, 20, 780, 170],
-        phone: [20, 14, 350, 130],
-      },
-      {
-        type: "embed",
-        title: "Weather",
-        showTitle: true,
-        config: { html: WEATHER_PANEL },
-        style: { ...panel, bg: "#1a0f18d9" },
-        computer: [640, 40, 400, 240],
-        tablet: [20, 210, 380, 180],
-        phone: [20, 156, 350, 150],
-      },
+      { component: "time.greeting", title: "Good morning", style: plum, computer: [40, 40, 560, 220], tablet: [20, 20, 780, 160], phone: [20, 14, 350, 120] },
+      { component: "weather.now", title: "Weather", style: plum, computer: [640, 40, 380, 220], tablet: [20, 200, 380, 190], phone: [20, 146, 350, 170] },
+      { component: "weather.details", title: "Details", style: plum, computer: [1060, 40, 340, 220], tablet: [420, 200, 380, 190], phone: [20, 328, 350, 170] },
       {
         type: "text",
         title: "Today",
         showTitle: true,
         config: { text: "☕ Coffee\n📞 Stand-up at 9\n🏃 Walk at lunch\n📮 Reply to emails" },
-        style: { ...panel, bg: "#1a0f18d9" },
-        computer: [1080, 40, 320, 240],
-        tablet: [420, 210, 380, 180],
-        phone: [20, 316, 350, 150],
+        style: { ...plum, autoFit: false, align: "left", fontSize: 15, padding: 16 },
+        computer: [40, 300, 420, 360],
+        tablet: [20, 410, 380, 250],
+        phone: [20, 510, 350, 150],
       },
       {
-        type: "feed",
+        component: "news.times",
         title: "Headlines",
         showTitle: true,
-        config: { url: FEEDS.bbcTop, count: 8, refresh: 15 },
-        style: { ...panel, bg: "#1a0f18d9" },
-        computer: [40, 320, 1000, 340],
-        tablet: [20, 410, 780, 250],
-        phone: [20, 478, 350, 210],
+        settings: { count: 6 },
+        style: plum,
+        computer: [500, 300, 900, 360],
+        tablet: [420, 410, 380, 250],
+        phone: [20, 672, 350, 150],
       },
     ],
   },
   {
     id: "scores",
     name: "Sports night",
-    description: "Live and upcoming games front and centre, with sports headlines.",
-    icon: "activity",
+    description: "Live scores front and centre, the next game, and sports headlines.",
+    icon: "trophy",
     theme: NIGHT,
     popIn: true,
+    sources: [{ key: "sportsNews", kind: "news", name: "Sports news", params: { url: FEEDS.espn } }],
     widgets: [
       {
-        type: "embed",
-        title: "Live & upcoming",
+        component: "sports.live",
+        title: "Live now",
         showTitle: true,
-        config: { html: SPORTS_PANEL },
-        style: panel,
-        computer: [40, 40, 700, 620],
-        tablet: [20, 20, 780, 360],
-        phone: [20, 14, 350, 320],
-      },
-      {
-        type: "clock",
-        title: "Clock",
-        showTitle: false,
-        config: { format: "h:mm A", sub: "dddd, DD MMM", timezone: "" },
+        settings: { count: 6 },
         style: card,
-        computer: [780, 40, 620, 200],
-        tablet: [20, 400, 380, 140],
-        phone: [20, 344, 350, 110],
+        computer: [40, 40, 700, 400],
+        tablet: [20, 20, 780, 280],
+        phone: [20, 14, 350, 260],
       },
+      { component: "sports.next", title: "Next game", style: card, computer: [40, 460, 700, 200], tablet: [20, 320, 380, 170], phone: [20, 288, 350, 150] },
+      { component: "time.simple", title: "Clock", style: card, computer: [780, 40, 620, 180], tablet: [420, 320, 380, 170], phone: [20, 452, 350, 110] },
       {
-        type: "feed",
+        component: "news.list",
         title: "Sports news",
         showTitle: true,
-        config: { url: FEEDS.espn, count: 8, refresh: 15 },
-        style: panel,
-        computer: [780, 260, 620, 400],
-        tablet: [420, 400, 380, 140],
-        phone: [20, 466, 350, 220],
+        use: { news: "sportsNews" },
+        settings: { count: 7 },
+        style: card,
+        computer: [780, 240, 620, 420],
+        tablet: [20, 510, 780, 170],
+        phone: [20, 576, 350, 180],
       },
     ],
   },
@@ -215,35 +173,15 @@ export const TEMPLATES: Template[] = [
     icon: "computer",
     theme: INK,
     widgets: [
+      { component: "time.big", title: "Clock", style: violet, computer: [40, 60, 1360, 400], tablet: [20, 40, 780, 300], phone: [20, 30, 350, 200] },
+      { component: "weather.compact", title: "Weather", style: violet, computer: [40, 490, 660, 190], tablet: [20, 360, 780, 150], phone: [20, 250, 350, 140] },
       {
-        type: "clock",
-        title: "Clock",
-        showTitle: false,
-        config: { format: "H:mm", sub: "dddd, DD MMMM", timezone: "" },
-        style: { ...card, bg: "#12101dcc" },
-        computer: [40, 60, 1360, 420],
-        tablet: [20, 40, 780, 300],
-        phone: [20, 30, 350, 220],
-      },
-      {
-        type: "embed",
-        title: "Weather",
-        showTitle: false,
-        config: { html: WEATHER_PANEL },
-        style: { ...panel, bg: "#12101dcc" },
-        computer: [40, 500, 660, 180],
-        tablet: [20, 360, 780, 150],
-        phone: [20, 270, 350, 160],
-      },
-      {
-        type: "feed",
-        title: "Headlines",
-        showTitle: true,
-        config: { url: FEEDS.bbcTop, count: 5, refresh: 15 },
-        style: { ...panel, bg: "#12101dcc", fontSize: 17 },
-        computer: [720, 500, 680, 180],
+        component: "news.top",
+        title: "Top story",
+        style: violet,
+        computer: [720, 490, 680, 190],
         tablet: [20, 530, 780, 150],
-        phone: [20, 450, 350, 240],
+        phone: [20, 410, 350, 180],
       },
     ],
   },
@@ -254,46 +192,45 @@ export const TEMPLATES: Template[] = [
     icon: "news",
     theme: INK,
     popIn: true,
+    sources: [
+      { key: "world", kind: "news", name: "World", params: { url: FEEDS.bbcWorld } },
+      { key: "tech", kind: "news", name: "Technology", params: { url: FEEDS.verge } },
+      { key: "business", kind: "news", name: "Business", params: { url: FEEDS.bbcBusiness } },
+    ],
     widgets: [
+      { component: "time.big", title: "Clock", style: violet, computer: [40, 40, 1360, 140], tablet: [20, 20, 780, 120], phone: [20, 14, 350, 100] },
       {
-        type: "clock",
-        title: "Clock",
-        showTitle: false,
-        config: { format: "h:mm A", sub: "dddd, DD MMMM YYYY", timezone: "" },
-        style: { ...card, bg: "#12101dcc" },
-        computer: [40, 40, 1360, 140],
-        tablet: [20, 20, 780, 120],
-        phone: [20, 14, 350, 100],
-      },
-      {
-        type: "feed",
+        component: "news.list",
         title: "World",
         showTitle: true,
-        config: { url: FEEDS.bbcWorld, count: 9, refresh: 15 },
-        style: { ...panel, bg: "#12101dcc" },
+        use: { news: "world" },
+        settings: { count: 8 },
+        style: violet,
         computer: [40, 200, 440, 460],
         tablet: [20, 160, 380, 250],
         phone: [20, 128, 350, 190],
       },
       {
-        type: "feed",
+        component: "news.list",
         title: "Technology",
         showTitle: true,
-        config: { url: FEEDS.verge, count: 9, refresh: 15 },
-        style: { ...panel, bg: "#12101dcc" },
+        use: { news: "tech" },
+        settings: { count: 8 },
+        style: violet,
         computer: [500, 200, 440, 460],
         tablet: [420, 160, 380, 250],
         phone: [20, 330, 350, 190],
       },
       {
-        type: "feed",
+        component: "news.list",
         title: "Business",
         showTitle: true,
-        config: { url: FEEDS.bbcBusiness, count: 9, refresh: 15 },
-        style: { ...panel, bg: "#12101dcc" },
+        use: { news: "business" },
+        settings: { count: 8 },
+        style: violet,
         computer: [960, 200, 440, 460],
         tablet: [20, 430, 780, 240],
-        phone: [20, 532, 350, 170],
+        phone: [20, 532, 350, 190],
       },
     ],
   },
@@ -309,18 +246,68 @@ export const TEMPLATES: Template[] = [
 
 export const templateById = (id: string) => TEMPLATES.find((t) => t.id === id);
 
-export function buildTemplatePanel(template: Template, name?: string): Panel {
-  const base = createPanel(name?.trim() || template.name);
-  const panelOut: Panel = { ...base, ...template.theme, id: base.id, name: base.name, widgets: [], animations: [] };
+/** What a template will put on the page, for menus and the bridge's list_templates. */
+export const templateContents = (t: Template) =>
+  t.widgets.map((spec) => (spec.component ? definitionFor(spec.component)?.name ?? spec.title : spec.title));
 
-  panelOut.widgets = template.widgets.map((spec, i) => {
-    const widget = createWidget(spec.type, spec.computer[0], spec.computer[1], i + 1);
-    const box = (b: Box) => ({ x: b[0], y: b[1], w: b[2], h: b[3], hidden: false });
-    const layouts: Record<BreakpointKey, ReturnType<typeof box>> = {
-      lg: box(spec.computer),
-      md: box(spec.tablet),
-      sm: box(spec.phone),
-    };
+const box = (b: Box): Rect => ({ x: b[0], y: b[1], w: b[2], h: b[3], hidden: false });
+
+/**
+ * Builds the page and whatever data sources it needs. Sources the dashboard already
+ * has are reused when their settings match, so applying two templates doesn't fetch twice.
+ */
+export function buildTemplate(
+  template: Template,
+  existing: DataSource[],
+  name?: string,
+): { panel: Panel; sources: DataSource[] } {
+  const base = createPanel(name?.trim() || template.name);
+  const panel: Panel = { ...base, ...template.theme, id: base.id, name: base.name, widgets: [], animations: [] };
+  const sources = [...existing];
+  const byKey: Record<string, string> = {};
+
+  const reuseOrCreate = (kind: string, params?: Record<string, string>, name?: string) => {
+    const match = sources.find(
+      (s) => s.kind === kind && Object.entries(params ?? {}).every(([k, v]) => s.params[k] === v),
+    );
+    if (match) return match;
+    const created = createSource(kind, params);
+    if (created) sources.push(name ? { ...created, name } : created);
+    return created && name ? { ...created, name } : created;
+  };
+
+  for (const spec of template.sources ?? []) {
+    const source = reuseOrCreate(spec.kind, spec.params, spec.name);
+    if (source) byKey[spec.key] = source.id;
+  }
+
+  panel.widgets = template.widgets.map((spec, i) => {
+    const layouts: Record<BreakpointKey, Rect> = { lg: box(spec.computer), md: box(spec.tablet), sm: box(spec.phone) };
+
+    if (spec.component) {
+      const def = definitionFor(spec.component);
+      const slots: Record<string, string> = {};
+      for (const need of def?.needs ?? []) {
+        const fromTemplate = spec.use?.[need.key] ? byKey[spec.use[need.key]] : null;
+        const source = fromTemplate ? sources.find((s) => s.id === fromTemplate) : reuseOrCreate(need.kind);
+        if (source) slots[need.key] = source.id;
+      }
+      const widget = createComponentWidget(
+        { defId: spec.component, sources: slots, params: { ...(spec.settings ?? {}) } },
+        { name: spec.title, w: spec.computer[2], h: spec.computer[3] },
+        spec.computer[0],
+        spec.computer[1],
+        i + 1,
+      );
+      return {
+        ...widget,
+        showTitle: spec.showTitle ?? false,
+        layouts,
+        style: { ...widget.style, ...(spec.style ?? {}) },
+      } satisfies Widget;
+    }
+
+    const widget = createWidget(spec.type ?? "text", spec.computer[0], spec.computer[1], i + 1);
     return {
       ...widget,
       title: spec.title,
@@ -331,8 +318,8 @@ export function buildTemplatePanel(template: Template, name?: string): Panel {
     };
   });
 
-  if (template.popIn && panelOut.widgets.length) {
-    panelOut.animations = [
+  if (template.popIn && panel.widgets.length) {
+    panel.animations = [
       {
         id: uid(),
         name: "Everything pops in",
@@ -344,5 +331,6 @@ export function buildTemplatePanel(template: Template, name?: string): Panel {
       },
     ];
   }
-  return panelOut;
+
+  return { panel, sources };
 }

@@ -1,5 +1,5 @@
 import type { SourceKind } from "../types";
-import { fetchJson, num } from "./shared";
+import { fetchJson, num } from "./shared.ts";
 
 export const locationSource: SourceKind = {
   kind: "location",

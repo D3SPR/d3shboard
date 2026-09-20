@@ -1,3 +1,6 @@
+import { COMPONENTS } from "../src/components/library/index.ts";
+import { SOURCE_KINDS } from "../src/data/registry.ts";
+import { THEMES } from "../src/themes/index.ts";
 import { PRESETS } from "../src/animations/presets.ts";
 import { PROPERTIES } from "../src/animations/properties.ts";
 import { BREAKPOINTS, FONTS, defaultStyle } from "../src/lib/board.ts";
@@ -39,9 +42,27 @@ const CONFIG_DOCS: Record<string, { about: string; keys: Record<string, string> 
 };
 
 export function buildGuide() {
+  const componentList = COMPONENTS.map((c) => {
+    const settings = (c.params ?? []).map((p) => `${p.key} (${p.kind}, default ${JSON.stringify(p.default)})`).join(", ");
+    const needs = c.needs.map((n) => n.kind).join(", ") || "no data";
+    return `  - \`${c.id}\` — ${c.name}: ${c.description} Needs ${needs}. Default size ${c.size.w}×${c.size.h}.${settings ? ` Settings: ${settings}.` : ""}`;
+  }).join("\n");
+
+  const sourceList = SOURCE_KINDS.map((k) => {
+    const settings = k.params.map((p) => `${p.key} (${p.kind}${p.options ? `: ${p.options.map((o) => o.value).filter(Boolean).slice(0, 6).join(" | ")}` : ""})`).join(", ");
+    const fields = k.fields
+      .map((f) => (f.type === "list" ? `${f.key}[] → ${(f.of ?? []).map((i) => i.key).join(", ")}` : f.key))
+      .join(", ");
+    return `- **${k.kind}** — ${k.description} Settings: ${settings || "none"}. Values: ${fields}.`;
+  }).join("\n");
+
+  const themeList = THEMES.map((t) => `  - \`${t.id}\` — ${t.name}: ${t.description}`).join("\n");
+
   const screenNames: Record<string, string> = { sm: "phone", md: "tablet", lg: "computer" };
   const screens = BREAKPOINTS.map((b) => `${screenNames[b.key]} (${b.width}px wide)`).join(", ");
   const widgets = Object.entries(WIDGET_DEFAULTS)
+    // "component" is a library design, documented in its own section above.
+    .filter(([type]) => type !== "component")
     .map(([type, def]) => {
       const docs = CONFIG_DOCS[type];
       const keys = Object.entries(docs.keys)
@@ -58,9 +79,10 @@ export function buildGuide() {
   return `# Building d3shboard dashboards
 
 ## How it fits together
-- A dashboard has **pages**. Each page has a theme (accent colour, font, background, grid), **components** (called widgets in the API) and **animations**. **Automations** belong to the whole dashboard.
+- A dashboard has **pages**. Each page has a theme (accent colour, font, background, grid), **components** (called widgets in the API) and **animations**. **Data sources** and **automations** belong to the whole dashboard.
 - Your changes apply live in the user's open browser tab and save automatically. \`undo_last_change\` reverts your latest change (up to 30 steps).
-- Good workflow: \`list_templates\` → \`apply_template\` (or build by hand) → adapt → **\`check_dashboard\`** → fix what it reports → repeat. Don't remove the user's existing content unless they ask; adding a page leaves their work alone.
+- **Build with library components, not code.** \`add_component\` places a ready-made design that already knows how to show weather, headlines, scores or the time, scales with its box and matches the theme. Writing a custom \`embed\` panel is the last resort, not the first move.
+- Good workflow: \`list_components\` (or \`list_templates\` → \`apply_template\`) → \`add_component\` → \`apply_theme\` → lay out phone and tablet → **\`check_dashboard\`** → fix what it reports → repeat. Don't remove the user's existing content unless they ask; adding a page leaves their work alone.
 - **You cannot see the dashboard.** \`check_dashboard\` is your eyes: it reports components off the edge or below the fold, overlaps, unreadable colours, failed feeds and live values, content cut off, and errors thrown inside custom panels. A layout that looks right in JSON is regularly broken on screen. It can only inspect real rendering for the page that is currently open, so \`set_view\` to a page before checking it.
 - Ids are returned by every add_* tool. Omitting \`pageId\` means the page currently open in the editor.
 
@@ -71,7 +93,25 @@ export function buildGuide() {
 - \`add_widget\` with \`layout\` sets the computer position and squeezes phone and tablet into their width. That squeeze only shifts things left, so components that sit side by side on a computer will usually **overlap on tablet and phone**. Always lay out tablet and phone yourself with \`set_widget_layout\`. On phones, stack components in one column (x 20, w 350).
 - The editor grid is 20px by default; multiples of 20 with 40px margins look tidy.
 
-## Component types
+## The component library (use these first)
+\`add_component\` takes a componentId from this list, places it, and creates whatever data source it needs — no keys, no fetching, no HTML:
+${componentList}
+
+Settings are passed as \`settings: { key: value }\`. To point a component at a particular source, pass \`dataSources: { slotKey: dataSourceId }\`; otherwise the first source of the right kind is used.
+
+## Data sources
+One source is shared by every component using it, so weather is fetched once no matter how many components show it. \`add_data_source\` / \`update_data_source\` configure them; \`list_variables\` shows what each one currently reads, which is the fastest way to tell whether data is actually flowing.
+${sourceList}
+
+- **weather** takes \`lat\`, \`lon\` and \`place\` (a label). Ask the user where they are, or read \`location\` first.
+- **sports** takes \`league\` like \`basketball/nba\`, \`football/nfl\`, \`hockey/nhl\`, \`baseball/mlb\`, \`soccer/eng.1\`, and an optional \`team\` code such as \`MIL\`.
+- **time** takes an optional IANA \`timezone\`; add a second one for a world clock.
+
+## Themes
+\`apply_theme\` sets a page's accent, font, background and every component's card look at once. Do this before fiddling with individual colours.
+${themeList}
+
+## Basic component types (for things the library doesn't cover)
 ${widgets}
 
 ## Component style (all fields optional, merged into the current style)
@@ -106,22 +146,23 @@ A rule applies its actions while **all** its conditions are true, only in viewin
 - conditions: \`timeRange\` {from, to "HH:MM", may wrap past midnight} | \`weekday\` {days: 0=Sun…6=Sat} | \`monthday\` {days: 1–31} | \`month\` {months: 1–12} | \`dataValue\` {url, path, op: is|isNot|contains|gt|lt, value (string)}.
 - actions: \`setPanel\` {panelId} | \`setAccent\` {color} | \`setFont\` {fontFamily} | \`setBackground\` {background} | \`setWidgetVisible\` {widgetId (any page), visible}.
 
-## Custom panels: the things that go wrong
-A \`embed\` component is a **sandboxed iframe**. It shares nothing with the page, which trips up almost every first attempt:
+## Custom panels: the last resort, and what goes wrong
+Before writing one, check \`list_components\` again — a library component is styled by the dashboard, scales with its box, works on every screen and can't throw errors. A \`embed\` component is a **sandboxed iframe**. It shares nothing with the page, which trips up almost every first attempt:
 - It does **not** inherit the dashboard's dark theme. With no background of its own the browser paints it **white**, so light text becomes invisible. Always start its CSS with \`html, body { background: transparent; color-scheme: dark; }\`.
 - It does **not** inherit the page font. \`@import\` the font you want, or use \`system-ui\`.
 - Scripts run, but there is no \`localStorage\` and no access to the dashboard. Only call APIs that allow browser requests (CORS \`*\`); anything else fails silently.
 - Size content to the box: the frame is exactly the component's inner area. Use \`height: 100%\`, \`overflow: auto\` for lists, and \`@media (max-height: …)\` to drop detail in short boxes. Component auto-fit does not scale anything inside a panel.
 - Errors inside the panel are reported to \`check_dashboard\`, so check after writing one.
 
-## Data sources that work from a browser, with no API key
+## Raw data sources (only needed inside custom panels)
 - **Weather** — \`https://api.open-meteo.com/v1/forecast?latitude=..&longitude=..&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto\`. Weather codes are WMO numbers; map them to words/icons yourself.
 - **Rough location** — \`https://get.geojs.io/v1/ip/geo.json\` (fields \`latitude\`, \`longitude\`, \`city\`). It follows the network connection, so a VPN moves it; let the user correct it.
 - **Sports scores and fixtures** — \`https://site.api.espn.com/apis/site/v2/sports/<sport>/<league>/scoreboard\`, e.g. \`football/nfl\`, \`football/college-football\`, \`baseball/mlb\`, \`basketball/nba\`, \`basketball/wnba\`, \`hockey/nhl\`. Each event has \`status.type.state\` (\`pre\`, \`in\`, \`post\`), \`status.type.shortDetail\`, \`date\`, and \`competitions[0].competitors[]\` with \`team.abbreviation\`, \`score\` and \`homeAway\`.
 - **News** — any RSS feed through the built-in \`feed\` component (it proxies via rss2json). Reliable ones: BBC \`https://feeds.bbci.co.uk/news/rss.xml\`, NYT \`https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml\`, The Verge \`https://www.theverge.com/rss/index.xml\`, ESPN \`https://www.espn.com/espn/rss/news\`.
-- Prefer the built-in \`feed\` and \`api\` components over a custom panel when they can do the job — they are styled by the dashboard and need no code.
+- All of these are already wrapped by the data sources above. Use them directly only inside a custom panel.
 
 ## Design tips
+- Reach for \`apply_theme\` and \`add_component\` before setting individual colours and sizes: they are consistent by construction.
 - Keep strong contrast between \`fg\` and \`bg\`, and between components and the page background.
 - A few well-sized components beat many tiny ones. Give clocks and live values large font sizes.
 - Match component styling to the page accent for a coherent look.

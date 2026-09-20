@@ -1,3 +1,8 @@
+import { definitionFor } from "../components/library";
+import type { CompNode } from "../components/types";
+import { liveData } from "../data/live";
+import { sourceKind } from "../data/registry";
+import { getPath } from "../lib/util";
 import { BREAKPOINTS, rectFor } from "../lib/board";
 import type { BoardDoc, BreakpointKey, Panel, Rect, Widget } from "../lib/types";
 import { embedProblems } from "./embedLog";
@@ -87,6 +92,81 @@ function checkContent(widget: Widget, findings: Finding[]) {
   }
 }
 
+const walk = (node: CompNode, visit: (n: CompNode) => void) => {
+  visit(node);
+  if (node.kind === "stack") node.children.forEach((c) => walk(c, visit));
+  if (node.kind === "repeat") walk(node.item, visit);
+  if (node.kind === "if") {
+    walk(node.then, visit);
+    if (node.else) walk(node.else, visit);
+  }
+};
+
+/** Library components can be checked properly: their data is named, not buried in HTML. */
+function checkComponent(widget: Widget, findings: Finding[]) {
+  const instance = widget.component;
+  if (widget.type !== "component" || !instance) return;
+  const add = (level: Finding["level"], message: string, fix?: string) =>
+    findings.push({ level, widget: widget.title, widgetId: widget.id, message, fix });
+
+  const def = definitionFor(instance.defId);
+  if (!def) {
+    add("error", `uses a component design that no longer exists ("${instance.defId}")`, "Delete it and add one from list_components.");
+    return;
+  }
+
+  const live = liveData();
+  const tree = instance.tree ?? def.root;
+
+  for (const need of def.needs) {
+    const sourceId = instance.sources[need.key];
+    const source = sourceId ? live.sources.find((s) => s.id === sourceId) : null;
+    if (!source) {
+      add("error", `has no ${need.kind} data attached, so it shows dashes`, `Call add_data_source with kind "${need.kind}", then update_widget's dataSources, or re-add the component.`);
+      continue;
+    }
+    const state = live.states[source.id];
+    if (state?.status === "error") {
+      add("error", `its ${source.name} data isn't loading: ${state.error}`, "Check the source's settings with list_data_sources.");
+    }
+  }
+
+  // A repeat over an empty list renders as its "nothing right now" line.
+  walk(tree, (node) => {
+    if (node.kind !== "repeat") return;
+    const sourceId = instance.sources[node.list.bind] ?? node.list.bind;
+    const state = live.states[sourceId];
+    if (!state?.value) return;
+    const list = getPath(state.value, node.list.path);
+    if (Array.isArray(list) && list.length === 0) {
+      add("note", `its “${node.list.path}” list is empty right now, so it shows its placeholder line`, "Usually fine — check back when there is something on.");
+    }
+  });
+
+  const missingParams = (def.params ?? []).filter((p) => {
+    const value = instance.params[p.key];
+    return p.kind === "text" && value !== undefined && String(value).trim() === "";
+  });
+  for (const p of missingParams) add("warning", `has an empty “${p.label}” setting`, `Set settings.${p.key}.`);
+}
+
+/** Sources nothing uses are usually left over from deleted components. */
+function checkSources(doc: BoardDoc, findings: Finding[]) {
+  const live = liveData();
+  const used = new Set(
+    doc.panels.flatMap((p) => p.widgets).flatMap((w) => Object.values(w.component?.sources ?? {})),
+  );
+  for (const source of doc.sources) {
+    const kind = sourceKind(source.kind);
+    const state = live.states[source.id];
+    if (!kind) continue;
+    if (state?.status === "error" && used.has(source.id)) continue; // already reported on the component
+    if (state?.status === "error") {
+      findings.push({ level: "warning", message: `The “${source.name}” data isn't loading: ${state.error}`, fix: "Check its settings with list_data_sources." });
+    }
+  }
+}
+
 function checkLayout(panel: Panel, widget: Widget, bp: BreakpointKey, canvasHeight: number, findings: Finding[]) {
   const rect = rectFor(widget, bp);
   if (rect.hidden) return;
@@ -158,6 +238,7 @@ export function checkDashboard(doc: BoardDoc, params: { pageId?: string; screen?
 
   for (const widget of panel.widgets) {
     checkContent(widget, findings);
+    checkComponent(widget, findings);
     const readability = contrastFinding(panel, widget);
     if (readability) findings.push(readability);
     for (const bp of screens) {
@@ -167,6 +248,7 @@ export function checkDashboard(doc: BoardDoc, params: { pageId?: string; screen?
     if (onScreen) checkLive(widget, findings);
   }
 
+  checkSources(doc, findings);
   if (!panel.widgets.length) findings.push({ level: "note", message: "This page is empty." });
 
   const rank = { error: 0, warning: 1, note: 2 };

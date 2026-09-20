@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **d3shboard** is a client-only dashboard builder (Vite + React 19 + TypeScript + Tailwind v4). People place components on a freeform canvas, style them, organise pages, add automations (time/data-based rules) and animations. There is no backend: all state lives in `localStorage`.
 
+Most of what people put on a page comes from the **component library**: ready-made designs bound to **data variables** (weather, headlines, scores, the time). Writing custom HTML is still possible but is now the escape hatch, not the main path. `docs/component-pivot.md` is the proposal this was built from.
+
 It started as a reverse-engineered rebuild of a Lovable app ("Canvas — Your Own Dashboard"). The original minified bundle is in git history (first commit) if behaviour ever needs to be compared.
 
 ## Commands
@@ -27,11 +29,31 @@ There is no test suite or linter configured.
 
 **State is one document** (`BoardDoc` in `src/lib/types.ts`) held in `App.tsx` with `useState` and saved to `localStorage` on every change. Everything else is derived from it.
 
-- **Storage compatibility matters.** The key is `dashboard.board.v1` (kept from the original app) and `normalizeDoc` in `src/lib/board.ts` must keep accepting every format ever written: the flat v1 shape (`widgets` at top level), multi-panel v3 (no `animations`), and current v4. Imported backup files go through the same function. When adding fields, give them defaults in `normalizePanel` / `defaultStyle` rather than bumping behaviour for old saves.
+- **Storage compatibility matters.** The key is `dashboard.board.v1` (kept from the original app) and `normalizeDoc` in `src/lib/board.ts` must keep accepting every format ever written: the flat v1 shape (`widgets` at top level), multi-panel v3 (no `animations`), v4 (no `sources`/`library`) and current v5. Imported backup files go through the same function. When adding fields, give them defaults in `normalizePanel` / `defaultStyle` rather than bumping behaviour for old saves.
 - **"Panels" in code are "Pages" in the UI.** Data model names were kept for compatibility; user-facing copy was changed. Likewise the `md` breakpoint is shown as "Tablet", `lg` as "Computer".
 - **Per-breakpoint layouts.** Each widget has `layouts.sm/md/lg` rects. Content and style are shared across breakpoints; position/size/hidden are not. In edit mode the breakpoint can be overridden from the toolbar; in view mode it follows window width (`breakpointFor`).
 - **Auto-fit** (`style.autoFit`, on for new widgets). The canvas renders `effectiveStyle(widget, rect)` rather than `widget.style`. With auto-fit on, `fontSize` and `padding` scale by `min(rect.w / defaultW, rect.h / defaultH)` from the type's size in `WIDGET_DEFAULTS`, and `align` is forced to center. Stored `fontSize`/`padding`/`align` are then ignored until auto-fit is turned off, at which point the calculated values are written back so nothing jumps. Widget content should size itself in `em` so it follows the card's font size, and Text/Feed centre vertically with `justify-content: safe center` when auto-fit is on. Saves without the field load with `autoFit: false` so existing dashboards don't change. Over the bridge, setting `fontSize`/`padding`/`align` turns auto-fit off unless `autoFit` is passed too.
 - **Edit vs display mode** (`doc.mode`). Automations and animations only apply in display mode. `App.tsx` builds a `RenderBoard` by overlaying automation effects (accent, font, background, per-widget visibility, forced page) onto the active panel.
+
+### Data sources and variables (`src/data/`)
+`doc.sources` holds configured **data sources**, shared by the whole dashboard so one fetch feeds every component using it.
+
+- A `SourceKind` (`src/data/sources/*.ts`, registered in `registry.ts`) declares its settings (`params`), refresh interval and typed `fields`, and a `load(params)` that fetches. Fields carry a `label`, a `FieldType`, default formatting and an `example` used for library previews before real data arrives — keep examples realistic, including list fields.
+- `useDataSources` (`store.ts`, provided through `DataContext` in `App.tsx`) fetches on each source's own schedule, keeps the last good values through a failed refresh, and seeds from a `localStorage` cache (`d3shboard.data.cache`) so a cold load paints real numbers. It also publishes a snapshot to `data/live.ts`, which is how the bridge and diagnostics read current values without being React components.
+- `formatValue` (`format.ts`) turns a raw value into display text; a `Binding`'s `format` overrides the field's own.
+- Everything must be key-free and CORS-friendly: there is no backend and no place to put a secret.
+
+### Components (`src/components/`)
+A component is a declarative tree (`CompNode`: `stack`, `text`, `icon`, `image`, `bar`, `divider`, `spacer`, `repeat`, `if`) rendered natively by `render.tsx` — **not** an iframe, so it inherits auto-fit, the page font, theme colours, animations and diagnostics.
+
+- Sizes are tokens rendered in `em` and colours are roles (`text`, `muted`, `accent`, `positive`, `negative`), which is what makes auto-fit and themes work. Don't put raw pixel sizes or hex colours in a component definition.
+- A `ComponentDef` (`library/*.ts`) declares `needs` (data source kinds), optional `params` and a `root` tree. Values inside it are literal strings, `{ bind, path }` (bind = a need key, or `@item` inside a `repeat`) or `{ param }`.
+- A placed component is `widget.type === "component"` with `widget.component: ComponentInstance` (`defId`, `sources` slot→id map, `params`, and `tree` once the design has been edited, which detaches it from the library). `config.baseW/baseH` carry the reference size auto-fit scales from.
+- The **component maker** (`src/ui/ComponentMaker.tsx`, tree helpers in `components/edit.ts`) edits that tree: outline, inspector, live preview at the card's real size, and a variable browser. Tapping a variable binds it to the selected piece; binding to a source the definition didn't ask for adds a slot keyed by the source id.
+- Saved designs live in `doc.library` (`SavedComponent`) and are placed by remapping their slots to sources of the same kinds.
+
+### Themes (`src/themes/`)
+A `Theme` sets accent, font, background and a `CardLook` together. Applying one patches the page and (unless turned off) every component's style. The per-component "Quick styles" in the Look tab stay separate — don't add a second list of card presets.
 
 ### Automations (`src/automations/engine.ts`)
 `useAutomations` re-evaluates every 20s and refetches `dataValue` URLs every 60s. A rule is active when all its conditions pass; its actions merge into an `AutomationEffects` object. `activeIds` is exposed so animations can trigger on a rule switching on.
@@ -49,6 +71,7 @@ Rules are stored **per panel** (`panel.animations`), each with a `trigger`, `tar
 ### AI agent bridge (`mcp/` + `src/bridge/`)
 The dashboard only exists in the browser's `localStorage`, so agents can't edit it directly. Instead the flow is: MCP client → `mcp/server.ts` (HTTP `/mcp` or stdio) → WebSocket `/bridge` → the open tab → `runOperation` → `setDoc`.
 
+- Component-era tools matter most: `list_components` / `add_component` (creates any data source it needs), `list_data_sources` / `add_data_source` / `update_data_source`, `list_variables` (what each source currently reads), `list_themes` / `apply_theme`. The guide pushes agents to these before custom HTML.
 - **All editing logic runs in the page** (`src/bridge/operations.ts`): pure functions `(doc, method, params) → { doc, result, summary }` built on the same model helpers the UI uses. The server is a thin relay: zod schemas in `mcp/tools.ts` validate input, then it forwards `{ method, params }` and returns the page's result. Add a capability by adding a `BridgeMethod` in `protocol.ts`, a case in `runOperation`, and a tool in `tools.ts`.
 - The public API uses friendly names ("pages", screens `phone`/`tablet`/`computer`, mode `editing`/`viewing`); `operations.ts` maps them to the internal `panels` / `sm|md|lg` / `edit|display`. `get_dashboard` with `raw: true` and `replace_dashboard` use the internal backup format.
 - `useAgentBridge` (mounted in `App.tsx`, active in both modes) applies changes through a ref before React re-renders, so back-to-back calls see each other. It keeps an in-memory undo stack of agent changes (30) and an activity log shown in `AgentDialog`.
@@ -57,18 +80,16 @@ The dashboard only exists in the browser's `localStorage`, so agents can't edit 
 - **Browser limits, not fixable server-side:** a page may only reach loopback if it is a secure context (https, or localhost). Plain http on a LAN address is blocked outright — `AgentDialog` detects this (`!window.isSecureContext` with a loopback bridge URL) and says so. Chrome additionally prompts for permission; Safari refuses entirely.
 - **Standalone bridge for hosted users.** `npm run build:bridge` (esbuild) bundles the server and its dependencies into one `dist-bridge/d3shboard-bridge.mjs` that runs on plain Node 22+ with no install step; it is published next to the app (e.g. `d3tech.xyz/d3shboard-bridge.mjs`) and the Agent dialog tells hosted users to `curl` it and run it. Do not tell people to `npx github:...`: npm 12 ships `allow-git=none`, so git installs fail by default. `mcp/bin.mjs` remains as the package bin for checkouts and checks the Node version first.
 - When running from a checkout, the pairing code and `bridge.json` sit in `mcp/`; the bundled build stores them in `~/.config/d3shboard` instead (`STATE_DIR` in `config.ts`, chosen by whether `mcp/tools.ts` sits beside the entry point).
-- `mcp/guide.ts` (the `get_guide` tool) is generated from the real preset, property, font and widget-default lists, so it stays in sync. It therefore imports `src/` files at runtime, which means those files (and anything they import at runtime) must use explicit `.ts` extensions on non-type imports. Currently that's `src/lib/board.ts`, `src/brand.ts`, `src/widgets/defaults.ts`, `src/animations/presets.ts`, `src/animations/properties.ts` and `src/bridge/protocol.ts`.
+- `mcp/guide.ts` (the `get_guide` tool) is generated from the real preset, property, font and widget-default lists, so it stays in sync. It therefore imports `src/` files at runtime, which means those files (and anything they import at runtime) must use explicit `.ts` extensions on non-type imports. Currently that's `src/lib/board.ts`, `src/brand.ts`, `src/widgets/defaults.ts`, `src/animations/presets.ts`, `src/animations/properties.ts`, `src/bridge/protocol.ts`, `src/themes/index.ts`, and the whole of `src/components/library/` and `src/data/` (registry, sources, `nodes.ts`, `lib/util.ts`).
 - The guide includes a custom-panel gotchas section and a list of key-free, CORS-friendly data sources (Open-Meteo, geojs, ESPN scoreboards, RSS) — keep it current when those change.
 - Port: `D3SH_BRIDGE_PORT` (default 7331). The app's bridge address is editable under Agent → Advanced.
 
 ### Templates (`src/templates/`)
-`TEMPLATES` describes ready-made pages (theme + widgets with all three screen layouts + an optional pop-in animation); `buildTemplatePanel` turns one into a fresh `Panel` with new ids. They are exposed three ways and must stay in sync: the Pages menu → "Start from a template", palette commands, and the bridge's `list_templates` / `apply_template`. Applying always **adds a page**, never replaces.
-
-`panels.ts` holds the custom-panel HTML (weather, sports) used by templates, generated from standalone files. Because they live in TypeScript template literals, any `\`, backtick or `${` inside the HTML must be escaped — an unescaped `\'` silently became a syntax error inside the panel and only `check_dashboard` caught it.
+`TEMPLATES` describes ready-made pages: a theme, optional named data sources, and specs that are either a library component (`component`, `settings`, `use`) or a basic widget type, each with all three screen layouts. `buildTemplate(template, existingSources, name?)` returns `{ panel, sources }` — it reuses a matching source instead of adding a second one, so applying two templates doesn't fetch the same feed twice. They are exposed three ways and must stay in sync: the Pages menu → "Start from a template", palette commands, and the bridge's `list_templates` / `apply_template`. Applying always **adds a page**, never replaces.
 
 ### Diagnostics (`src/bridge/diagnostics.ts`)
 `check_dashboard` is the agent's only way to see what it built. Two layers:
-- **Model checks** (any page): off-canvas, below-the-fold (the canvas doesn't scroll), overlaps, sub-minimum sizes, missing config (feed/api/image/embed), custom panels with no `color-scheme`, and fg/bg contrast composited over the page background.
+- **Model checks** (any page): off-canvas, below-the-fold (the canvas doesn't scroll), overlaps, sub-minimum sizes, missing config (feed/api/image/embed), custom panels with no `color-scheme`, and fg/bg contrast composited over the page background. For library components it also reports unattached data slots, sources that failed to load and lists that are currently empty — these read live values from `data/live.ts`.
 - **Live checks** (only the page currently on screen, found via `data-widget-id`): content taller than its box, feeds that failed or are still loading, live values showing the error dash, broken images, and errors thrown inside custom panels.
 
 Custom panels can't be inspected from outside, so `WidgetBody`'s embed wrapper injects a reporter that posts `error`, `unhandledrejection` and `console.error` up to the page; `bridge/embedLog.ts` collects them (started in `main.tsx`) and diagnostics reads them per widget. Keep that reporter when editing the embed wrapper.
@@ -91,4 +112,4 @@ Branding (name, tagline, default accent, export filename) lives in `src/brand.ts
 
 ## Runtime network calls
 
-Widgets fetch directly from the browser: `api.rss2json.com` (news feeds), arbitrary user JSON URLs (Live number, automation data conditions), `picsum.photos` (default picture), and Google Fonts from `index.html`. CORS failures surface as the widget's error/placeholder state.
+Data sources and widgets fetch directly from the browser: `api.open-meteo.com` and `geocoding-api.open-meteo.com` (weather and the place search), `get.geojs.io` (rough location), `site.api.espn.com` (scores), `api.rss2json.com` (news feeds), arbitrary user JSON URLs (Live number, the "any data link" source, automation data conditions), `picsum.photos` (default picture), and Google Fonts from `index.html`. CORS failures surface as the widget's error/placeholder state.

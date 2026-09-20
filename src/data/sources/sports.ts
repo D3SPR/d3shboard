@@ -1,5 +1,5 @@
 import type { SourceKind } from "../types";
-import { fetchJson, num } from "./shared";
+import { fetchJson, num } from "./shared.ts";
 
 const LEAGUES = [
   { value: "football/nfl", label: "NFL" },

@@ -1,11 +1,11 @@
-import { uid } from "../lib/board";
+import { uid } from "../lib/board.ts";
 import type { DataSource, FieldDef, SourceKind, SourceParams } from "./types";
-import { jsonSource } from "./sources/json";
-import { locationSource } from "./sources/location";
-import { newsSource } from "./sources/news";
-import { sportsSource } from "./sources/sports";
-import { timeSource } from "./sources/time";
-import { weatherSource } from "./sources/weather";
+import { jsonSource } from "./sources/json.ts";
+import { locationSource } from "./sources/location.ts";
+import { newsSource } from "./sources/news.ts";
+import { sportsSource } from "./sources/sports.ts";
+import { timeSource } from "./sources/time.ts";
+import { weatherSource } from "./sources/weather.ts";
 
 /** Every kind of data the app can fetch. Components say which kinds they need. */
 export const SOURCE_KINDS: SourceKind[] = [

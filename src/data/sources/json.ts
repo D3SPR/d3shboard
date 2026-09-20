@@ -1,6 +1,6 @@
-import { getPath } from "../../lib/util";
+import { getPath } from "../../lib/util.ts";
 import type { SourceKind } from "../types";
-import { fetchJson } from "./shared";
+import { fetchJson } from "./shared.ts";
 
 export const jsonSource: SourceKind = {
   kind: "json",

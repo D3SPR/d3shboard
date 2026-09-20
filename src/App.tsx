@@ -33,7 +33,7 @@ import { AnimationsDialog, newAnimationRule } from "./ui/AnimationsDialog";
 import { TemplatesDialog } from "./ui/TemplatesDialog";
 import { ThemesDialog } from "./ui/ThemesDialog";
 import { themeById } from "./themes";
-import { buildTemplatePanel, templateById } from "./templates";
+import { buildTemplate, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
 import { ComponentLibrary } from "./ui/ComponentLibrary";
@@ -491,8 +491,8 @@ export default function App() {
   const applyTemplate = (templateId: string) => {
     const template = templateById(templateId);
     if (!template) return;
-    const panel = buildTemplatePanel(template);
-    setDoc((d) => ({ ...d, panels: [...d.panels, panel], activePanelId: panel.id }));
+    const { panel, sources } = buildTemplate(template, doc.sources);
+    setDoc((d) => ({ ...d, sources, panels: [...d.panels, panel], activePanelId: panel.id }));
     setSelectedId(null);
     setEditingWidgetId(null);
     setShowTemplates(false);

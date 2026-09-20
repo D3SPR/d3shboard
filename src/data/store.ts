@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { setLiveData } from "./live";
 import { sourceKind } from "./registry";
 import type { DataSource, SourceState } from "./types";
 
@@ -119,5 +120,7 @@ export function useDataSources(sources: DataSource[]): DataStore {
     setNonce((n) => n + 1);
   }, []);
 
-  return useMemo(() => ({ states, sources, refresh }), [states, sources, refresh]);
+  const store = useMemo(() => ({ states, sources, refresh }), [states, sources, refresh]);
+  useEffect(() => setLiveData({ states, sources }), [states, sources]);
+  return store;
 }

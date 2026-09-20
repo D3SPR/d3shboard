@@ -1,4 +1,4 @@
-import { bar, bind, col, divider, param, row, spacer, text } from "../nodes";
+import { bar, bind, col, divider, param, row, spacer, text } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needsJson = [{ key: "data", kind: "json", label: "Any data link" }];

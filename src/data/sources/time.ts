@@ -1,4 +1,4 @@
-import { DAY_NAMES, MONTH_NAMES, formatDate } from "../../lib/util";
+import { DAY_NAMES, MONTH_NAMES, formatDate } from "../../lib/util.ts";
 import type { SourceKind } from "../types";
 
 const inZone = (tz: string) => {

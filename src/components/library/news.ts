@@ -1,4 +1,4 @@
-import { bind, col, item, param, repeat, row, spacer, text } from "../nodes";
+import { bind, col, item, param, repeat, row, spacer, text } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needs = [{ key: "news", kind: "news", label: "News headlines" }];

@@ -1,7 +1,7 @@
-import { DAY_NAMES } from "../../lib/util";
+import { DAY_NAMES } from "../../lib/util.ts";
 import type { IconName } from "../../ui/icons";
 import type { SourceKind } from "../types";
-import { fetchJson, num } from "./shared";
+import { fetchJson, num } from "./shared.ts";
 
 /** WMO weather codes → a word and one of the app's weather icons. */
 const CODES: Record<number, { text: string; icon: IconName }> = {

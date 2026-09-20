@@ -19,3 +19,18 @@ export const num = (v: unknown, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
+
+const ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "…", mdash: "—", ndash: "–",
+  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", "#39": "'", "#8217": "’", "#8216": "‘", "#8220": "“", "#8221": "”",
+};
+
+/** Feeds arrive as XML, so their text is full of entities. Decoded without touching the DOM. */
+export const decodeEntities = (text: string) =>
+  text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, name: string) => {
+    const key = name.toLowerCase();
+    if (ENTITIES[key]) return ENTITIES[key];
+    if (key.startsWith("#x")) return String.fromCodePoint(parseInt(key.slice(2), 16));
+    if (key.startsWith("#")) return String.fromCodePoint(Number(key.slice(1)));
+    return whole;
+  });

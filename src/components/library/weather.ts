@@ -1,4 +1,4 @@
-import { bar, bind, col, icon, item, param, repeat, row, spacer, text } from "../nodes";
+import { bar, bind, col, icon, item, param, repeat, row, spacer, text } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needs = [{ key: "weather", kind: "weather", label: "Weather" }];

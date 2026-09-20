@@ -1,5 +1,5 @@
 import type { SourceKind } from "../types";
-import { fetchJson } from "./shared";
+import { decodeEntities, fetchJson } from "./shared.ts";
 
 const itemFields = [
   { key: "title", label: "Headline", type: "text" as const, example: "Something happened somewhere" },
@@ -57,9 +57,9 @@ export const newsSource: SourceKind = {
     const url = params.url || "https://feeds.bbci.co.uk/news/rss.xml";
     const data = await fetchJson(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
     if (!Array.isArray(data.items)) throw new Error(data.message || "That feed didn't return any headlines.");
-    const source = data.feed?.title ?? "";
+    const source = decodeEntities(data.feed?.title ?? "");
     const items = data.items.slice(0, 12).map((item: any) => ({
-      title: item.title ?? "",
+      title: decodeEntities(item.title ?? ""),
       source,
       time: item.pubDate ? item.pubDate.replace(" ", "T") : "",
       image: item.thumbnail || item.enclosure?.link || "",

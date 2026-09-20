@@ -1,9 +1,9 @@
 import type { ComponentCategory, ComponentDef } from "../types";
-import { BASIC_COMPONENTS } from "./basics";
-import { NEWS_COMPONENTS } from "./news";
-import { SPORTS_COMPONENTS } from "./sports";
-import { TIME_COMPONENTS } from "./time";
-import { WEATHER_COMPONENTS } from "./weather";
+import { BASIC_COMPONENTS } from "./basics.ts";
+import { NEWS_COMPONENTS } from "./news.ts";
+import { SPORTS_COMPONENTS } from "./sports.ts";
+import { TIME_COMPONENTS } from "./time.ts";
+import { WEATHER_COMPONENTS } from "./weather.ts";
 
 /** Everything in the component library, in the order the browser shows it. */
 export const COMPONENTS: ComponentDef[] = [

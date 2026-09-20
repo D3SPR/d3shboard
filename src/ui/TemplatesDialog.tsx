@@ -1,4 +1,4 @@
-import { TEMPLATES } from "../templates";
+import { TEMPLATES, templateContents } from "../templates";
 import { Icon } from "./icons";
 import { Dialog, Intro } from "./kit";
 
@@ -31,9 +31,9 @@ export function TemplatesDialog({ onPick, onClose }: { onPick: (templateId: stri
             <span className="text-[12px] leading-snug text-white/55">{t.description}</span>
             {t.widgets.length ? (
               <span className="mt-0.5 flex flex-wrap gap-1">
-                {t.widgets.map((w, i) => (
+                {templateContents(t).map((label, i) => (
                   <span key={i} className="rounded bg-white/[0.07] px-1.5 py-0.5 text-[10.5px] text-white/60">
-                    {w.title}
+                    {label}
                   </span>
                 ))}
               </span>

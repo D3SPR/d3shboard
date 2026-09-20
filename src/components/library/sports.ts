@@ -1,4 +1,4 @@
-import { bind, col, image, item, param, repeat, row, spacer, text, when } from "../nodes";
+import { bind, col, image, item, param, repeat, row, spacer, text, when } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needs = [{ key: "sports", kind: "sports", label: "Sports scores" }];

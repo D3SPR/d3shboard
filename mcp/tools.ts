@@ -13,6 +13,7 @@ const keys = <T extends { key: string }>(items: T[]) => items.map((i) => i.key) 
 
 const pageId = z.string().optional().describe("Page id. Omit to use the page currently open in the editor.");
 const widgetType = z.enum(["clock", "text", "image", "iframe", "feed", "api", "embed"]);
+const componentCategory = z.enum(["Time", "Weather", "News", "Sports", "Numbers", "Text & shapes"]);
 const screen = z.enum(["phone", "tablet", "computer"]);
 
 const rect = z.object({
@@ -366,6 +367,132 @@ export function registerTools(server: McpServer, call: Call) {
       annotations: DESTRUCTIVE,
     },
     (args) => call("replaceDashboard", args),
+  );
+
+  server.registerTool(
+    "list_components",
+    {
+      title: "List the component library",
+      description:
+        "Ready-made component designs that show live data with no code: what each one shows, what data it needs and what settings it takes. Prefer these over building a custom panel — they are styled by the dashboard, scale with their box and never break.",
+      inputSchema: { category: componentCategory.optional() },
+      annotations: READ,
+    },
+    (args) => call("listComponents", args),
+  );
+
+  server.registerTool(
+    "add_component",
+    {
+      title: "Place a component from the library",
+      description:
+        "Adds a library component to a page. Any data source it needs is created automatically (and reused if one already exists), so this is the fastest way to put weather, headlines, scores or the time on a page.",
+      inputSchema: {
+        componentId: z.string().describe("From list_components."),
+        pageId,
+        title: z.string().optional(),
+        layout: rect.optional().describe("Computer position and size; defaults to the component's own size."),
+        layouts: z.object({ phone: rect, tablet: rect, computer: rect }).partial().optional(),
+        settings: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe("The component's own settings, from list_components."),
+        dataSources: z.record(z.string(), z.string()).optional().describe("slot key → data source id, when you want a specific source."),
+        style: style.optional(),
+        showTitle: z.boolean().optional(),
+        locked: z.boolean().optional(),
+      },
+      annotations: WRITE,
+    },
+    (args) => call("addComponent", args),
+  );
+
+  server.registerTool(
+    "list_data_sources",
+    {
+      title: "List data sources",
+      description:
+        "What live data this dashboard is set up with (and whether it is loading properly), plus every kind that can be added. Components read from these.",
+      annotations: READ,
+    },
+    () => call("listDataSources", {}),
+  );
+
+  server.registerTool(
+    "add_data_source",
+    {
+      title: "Add a data source",
+      description:
+        "Sets up live data the whole dashboard shares — one fetch feeds every component using it. Weather needs lat/lon settings; sports needs a league; news takes a feed URL.",
+      inputSchema: {
+        kind: z.string().describe("From list_data_sources.available."),
+        name: z.string().optional(),
+        settings: z.record(z.string(), z.string()).optional(),
+      },
+      annotations: WRITE,
+    },
+    (args) => call("addDataSource", args),
+  );
+
+  server.registerTool(
+    "update_data_source",
+    {
+      title: "Change a data source's settings",
+      description: "Changes where a data source points — the place for weather, the league for sports, the feed for news.",
+      inputSchema: {
+        dataSourceId: z.string(),
+        name: z.string().optional(),
+        settings: z.record(z.string(), z.string()).optional(),
+      },
+      annotations: WRITE,
+    },
+    (args) => call("updateDataSource", args),
+  );
+
+  server.registerTool(
+    "delete_data_source",
+    {
+      title: "Remove a data source",
+      description: "Removes live data. Refuses if components still use it unless force is true.",
+      inputSchema: { dataSourceId: z.string(), force: z.boolean().optional() },
+      annotations: WRITE,
+    },
+    (args) => call("deleteDataSource", args),
+  );
+
+  server.registerTool(
+    "list_variables",
+    {
+      title: "List the values data sources offer",
+      description:
+        "Every variable the dashboard's data sources expose, with what each one currently reads. Use it to check data is flowing and to find paths for custom component designs.",
+      inputSchema: { dataSourceId: z.string().optional() },
+      annotations: READ,
+    },
+    (args) => call("listVariables", args),
+  );
+
+  server.registerTool(
+    "list_themes",
+    {
+      title: "List themes",
+      description: "Ready-made looks: accent colour, font, background and card style together.",
+      annotations: READ,
+    },
+    () => call("listThemes", {}),
+  );
+
+  server.registerTool(
+    "apply_theme",
+    {
+      title: "Apply a theme to a page",
+      description:
+        "Sets a page's accent, font, background and (unless restyleComponents is false) every component's card look in one call. The quickest way to make a page look deliberate.",
+      inputSchema: {
+        themeId: z.string().describe("From list_themes."),
+        pageId,
+        restyleComponents: z.boolean().optional().describe("Default true."),
+      },
+      annotations: WRITE,
+    },
+    (args) => call("applyTheme", args),
   );
 
   server.registerTool(

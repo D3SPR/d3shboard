@@ -1,4 +1,4 @@
-import { bind, col, param, row, spacer, text, when } from "../nodes";
+import { bind, col, param, row, spacer, text, when } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needsTime = [{ key: "time", kind: "time", label: "Time & date" }];
