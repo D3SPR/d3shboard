@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CATEGORIES, COMPONENTS } from "../components/library";
 import { renderComponent } from "../components/render";
-import type { ComponentCategory, ComponentDef, ComponentInstance } from "../components/types";
+import type { ComponentCategory, ComponentDef, ComponentInstance, SavedComponent } from "../components/types";
 import { useDataStore } from "../data/store";
 import { Icon } from "./icons";
 import { Dialog, Intro, inputClass } from "./kit";
@@ -42,8 +42,32 @@ function Preview({ def }: { def: ComponentDef }) {
   );
 }
 
-export function ComponentLibrary({ onPick, onClose }: { onPick: (defId: string) => void; onClose: () => void }) {
-  const [category, setCategory] = useState<ComponentCategory | "All">("All");
+/** A saved design is shown exactly like a library one, using its own tree. */
+const asDefinition = (saved: SavedComponent): ComponentDef => ({
+  id: saved.id,
+  name: saved.name,
+  description: saved.description,
+  icon: saved.icon,
+  category: "Text & shapes",
+  size: saved.size,
+  needs: saved.slots.map((slot) => ({ key: slot.key, kind: slot.kind, label: slot.kind })),
+  root: saved.tree,
+});
+
+export function ComponentLibrary({
+  saved,
+  onPick,
+  onPickSaved,
+  onForgetSaved,
+  onClose,
+}: {
+  saved: SavedComponent[];
+  onPick: (defId: string) => void;
+  onPickSaved: (savedId: string) => void;
+  onForgetSaved: (savedId: string) => void;
+  onClose: () => void;
+}) {
+  const [category, setCategory] = useState<ComponentCategory | "All" | "Mine">("All");
   const [query, setQuery] = useState("");
 
   const shown = useMemo(() => {
@@ -76,7 +100,7 @@ export function ComponentLibrary({ onPick, onClose }: { onPick: (defId: string) 
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="flex flex-wrap gap-1.5">
-          {(["All", ...CATEGORIES] as const).map((c) => (
+          {([...(saved.length ? (["Mine"] as const) : []), "All", ...CATEGORIES] as const).map((c) => (
             <button
               key={c}
               onClick={() => setCategory(c)}
@@ -90,8 +114,41 @@ export function ComponentLibrary({ onPick, onClose }: { onPick: (defId: string) 
         </div>
       </div>
 
+      {saved.length && (category === "All" || category === "Mine") ? (
+        <div className="mb-4">
+          <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">My components</p>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {saved.map((item) => (
+              <div key={item.id} className="relative">
+                <button
+                  onClick={() => onPickSaved(item.id)}
+                  className="flex w-full flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
+                >
+                  <Preview def={asDefinition(item)} />
+                  <span className="flex items-center gap-2">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[var(--accent)]/15 text-[var(--accent)]">
+                      <Icon name={item.icon} size={13} />
+                    </span>
+                    <span className="text-[13px] font-semibold">{item.name}</span>
+                  </span>
+                  <span className="-mt-1 text-[12px] leading-snug text-white/50">{item.description}</span>
+                </button>
+                <button
+                  title="Forget this component"
+                  aria-label={`Forget ${item.name}`}
+                  onClick={() => confirm(`Forget “${item.name}”? Components already on your pages stay as they are.`) && onForgetSaved(item.id)}
+                  className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-md bg-black/50 text-white/60 transition hover:bg-red-500/30 hover:text-white"
+                >
+                  <Icon name="trash" size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-2.5 sm:grid-cols-2">
-        {shown.map((def) => (
+        {category !== "Mine" ? shown.map((def) => (
           <button
             key={def.id}
             onClick={() => onPick(def.id)}
@@ -106,10 +163,10 @@ export function ComponentLibrary({ onPick, onClose }: { onPick: (defId: string) 
             </span>
             <span className="-mt-1 text-[12px] leading-snug text-white/50">{def.description}</span>
           </button>
-        ))}
+        )) : null}
       </div>
 
-      {!shown.length ? <p className="py-6 text-center text-[13px] text-white/45">Nothing matches that.</p> : null}
+      {!shown.length && category !== "Mine" ? <p className="py-6 text-center text-[13px] text-white/45">Nothing matches that.</p> : null}
     </Dialog>
   );
 }

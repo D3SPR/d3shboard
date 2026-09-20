@@ -1,4 +1,4 @@
-import type { ComponentInstance } from "../components/types";
+import type { ComponentInstance, SavedComponent } from "../components/types";
 import type { DataSource } from "../data/types";
 
 export type BreakpointKey = "sm" | "md" | "lg";
@@ -143,6 +143,8 @@ export type BoardDoc = {
   automations: Automation[];
   /** Data sources the whole dashboard shares, so one fetch feeds every component using it. */
   sources: DataSource[];
+  /** Component designs the user saved for reuse. */
+  library: SavedComponent[];
 };
 
 export type RenderBoard = Panel & { mode: Mode };

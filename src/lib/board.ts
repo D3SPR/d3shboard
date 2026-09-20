@@ -174,7 +174,7 @@ const starterPanel = (): Panel => ({
 
 export const starterDoc = (): BoardDoc => {
   const panel = starterPanel();
-  return { version: 5, mode: "edit", panels: [panel], activePanelId: panel.id, automations: [], sources: [] };
+  return { version: 5, mode: "edit", panels: [panel], activePanelId: panel.id, automations: [], sources: [], library: [] };
 };
 
 type Loose = Record<string, any>;
@@ -228,11 +228,20 @@ export function normalizeDoc(input: unknown): BoardDoc {
         : panels[0].id,
       automations: Array.isArray(doc.automations) ? doc.automations : [],
       sources: normalizeSources(doc.sources),
+      library: Array.isArray(doc.library) ? doc.library : [],
     };
   }
   if (Array.isArray(doc.widgets)) {
     const panel = normalizePanel(doc, 0);
-    return { version: 5, mode, panels: [panel], activePanelId: panel.id, automations: [], sources: normalizeSources(doc.sources) };
+    return {
+      version: 5,
+      mode,
+      panels: [panel],
+      activePanelId: panel.id,
+      automations: [],
+      sources: normalizeSources(doc.sources),
+      library: Array.isArray(doc.library) ? doc.library : [],
+    };
   }
   return starterDoc();
 }

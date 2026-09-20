@@ -93,6 +93,19 @@ export type ComponentDef = {
   root: CompNode;
 };
 
+/** A design the user saved, ready to place again. Slots are remapped to real sources on placing. */
+export type SavedComponent = {
+  id: string;
+  name: string;
+  description: string;
+  icon: IconName;
+  baseDefId: string;
+  size: { w: number; h: number };
+  slots: { key: string; kind: string }[];
+  params: Record<string, string | number>;
+  tree: CompNode;
+};
+
 /** What a placed component stores: which sources fill its slots, plus its settings. */
 export type ComponentInstance = {
   defId: string;

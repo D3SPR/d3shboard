@@ -24,6 +24,8 @@ type Props = {
   onEditAnimation: (ruleId: string) => void;
   onNewAnimation: (widgetId: string) => void;
   onOpenData: () => void;
+  onDesign: () => void;
+  onSaveToLibrary: () => void;
 };
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -171,7 +173,7 @@ const TOKEN_HELP = (
   </>
 );
 
-function ContentTab({ widget, update, onOpenData }: Props) {
+function ContentTab({ widget, update, onOpenData, onDesign, onSaveToLibrary }: Props) {
   const cfg = widget.config;
   const set = (key: string, value: string | number) => update(widget.id, { config: { ...cfg, [key]: value } });
   const s = (key: string) => String(cfg[key] ?? "");
@@ -279,7 +281,15 @@ function ContentTab({ widget, update, onOpenData }: Props) {
       fields = <ApiFields widget={widget} set={set} />;
       break;
     case "component":
-      fields = <ComponentFields widget={widget} update={update} onOpenData={onOpenData} />;
+      fields = (
+        <ComponentFields
+          widget={widget}
+          update={update}
+          onOpenData={onOpenData}
+          onDesign={onDesign}
+          onSaveToLibrary={onSaveToLibrary}
+        />
+      );
       break;
     case "embed":
       fields = (
@@ -328,10 +338,14 @@ function ComponentFields({
   widget,
   update,
   onOpenData,
+  onDesign,
+  onSaveToLibrary,
 }: {
   widget: Widget;
   update: (id: string, patch: Partial<Widget>) => void;
   onOpenData: () => void;
+  onDesign: () => void;
+  onSaveToLibrary: () => void;
 }) {
   const store = useDataStore();
   const instance = widget.component;
@@ -393,6 +407,12 @@ function ComponentFields({
         );
       })}
 
+      <div className="mb-3 flex gap-1.5">
+        <Button icon="layers" className="flex-1" onClick={onDesign}>
+          {instance.tree ? "Keep designing" : "Design this component"}
+        </Button>
+        <Button icon="save" title="Save to my components" onClick={onSaveToLibrary} className="px-2.5" />
+      </div>
       <p className="mb-3 text-[12px] leading-relaxed text-white/45">
         Everything this shows updates by itself. Change where the information comes from in the <b>Data</b> menu.
       </p>

@@ -25,6 +25,7 @@ import { DataContext, useDataSources } from "./data/store";
 import type { DataSource } from "./data/types";
 import { createSource } from "./data/registry";
 import { definitionFor } from "./components/library";
+import type { SavedComponent } from "./components/types";
 import { buildCommands, type Command } from "./commands/buildCommands";
 import { isPaletteHotkey } from "./commands/shortcut";
 import { AgentDialog } from "./ui/AgentDialog";
@@ -36,6 +37,7 @@ import { buildTemplatePanel, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
 import { ComponentLibrary } from "./ui/ComponentLibrary";
+import { ComponentMaker } from "./ui/ComponentMaker";
 import { DataDialog } from "./ui/DataDialog";
 import { Icon } from "./ui/icons";
 import { Toolbar, type MenuId } from "./ui/Toolbar";
@@ -77,6 +79,7 @@ export default function App() {
   const [showData, setShowData] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
+  const [makerWidgetId, setMakerWidgetId] = useState<string | null>(null);
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -235,6 +238,69 @@ export default function App() {
     },
     [doc.sources, panel.widgets],
   );
+
+  /** Places a design the user saved, hooking it up to sources of the kinds it expects. */
+  const addSavedComponent = useCallback(
+    (savedId: string) => {
+      const saved = doc.library.find((s) => s.id === savedId);
+      if (!saved) return;
+      const sources = [...doc.sources];
+      const slots: Record<string, string> = {};
+      for (const slot of saved.slots) {
+        let found = sources.find((s) => s.kind === slot.kind);
+        if (!found) {
+          const created = createSource(slot.kind);
+          if (created) {
+            sources.push(created);
+            found = created;
+          }
+        }
+        if (found) slots[slot.key] = found.id;
+      }
+      const z = Math.max(0, ...panel.widgets.map((w) => w.z)) + 1;
+      const widget = createComponentWidget(
+        { defId: saved.baseDefId, sources: slots, params: { ...saved.params }, tree: saved.tree },
+        { name: saved.name, w: saved.size.w, h: saved.size.h },
+        40,
+        40,
+        z,
+      );
+      setDoc((d) => ({
+        ...d,
+        sources,
+        panels: d.panels.map((p) => (p.id === d.activePanelId ? { ...p, widgets: [...p.widgets, widget] } : p)),
+      }));
+      setSelectedId(widget.id);
+      setShowLibrary(false);
+    },
+    [doc.library, doc.sources, panel.widgets],
+  );
+
+  /** Remembers the component as it stands now, so it can be placed again later. */
+  const saveComponent = (widgetId: string) => {
+    const widget = panel.widgets.find((w) => w.id === widgetId);
+    const instance = widget?.component;
+    const def = instance ? definitionFor(instance.defId) : null;
+    if (!widget || !instance || !def) return;
+    const name = prompt("Save this component as:", widget.title)?.trim();
+    if (!name) return;
+    const rect = rectFor(widget, bp);
+    const saved: SavedComponent = {
+      id: uid(),
+      name,
+      description: `Your own version of ${def.name}.`,
+      icon: def.icon,
+      baseDefId: instance.defId,
+      size: { w: Math.round(rect.w), h: Math.round(rect.h) },
+      slots: Object.entries(instance.sources)
+        .map(([key, sourceId]) => ({ key, kind: doc.sources.find((s) => s.id === sourceId)?.kind ?? "" }))
+        .filter((slot) => slot.kind),
+      params: { ...instance.params },
+      tree: instance.tree ?? def.root,
+    };
+    setDoc((d) => ({ ...d, library: [...d.library, saved] }));
+    showNotice(`Saved “${name}” to your components.`);
+  };
 
   const removeWidget = useCallback(
     (id: string) => {
@@ -400,7 +466,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || showThemes || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || showThemes || !!makerWidgetId || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -469,6 +535,7 @@ export default function App() {
     setShowData(false);
     setShowLibrary(false);
     setShowThemes(false);
+    setMakerWidgetId(null);
     setOpenMenu(null);
   };
 
@@ -521,6 +588,8 @@ export default function App() {
           openThemes: () => setShowThemes(true),
           applyTheme,
           addComponent,
+          designComponent: (id) => setMakerWidgetId(id),
+          saveComponent,
           addSource: (kind) => {
             const created = createSource(kind);
             if (created) setDoc((d) => ({ ...d, sources: [...d.sources, created] }));
@@ -666,6 +735,24 @@ export default function App() {
             setEditingWidgetId(null);
             setShowData(true);
           }}
+          onDesign={() => {
+            setEditingWidgetId(null);
+            setMakerWidgetId(editingWidget.id);
+          }}
+          onSaveToLibrary={() => saveComponent(editingWidget.id)}
+        />
+      ) : null}
+
+      {editing && makerWidgetId ? (
+        <ComponentMaker
+          widget={panel.widgets.find((w) => w.id === makerWidgetId) ?? panel.widgets[0]}
+          bp={bp}
+          update={updateWidget}
+          onClose={() => setMakerWidgetId(null)}
+          onOpenData={() => {
+            setMakerWidgetId(null);
+            setShowData(true);
+          }}
         />
       ) : null}
 
@@ -694,7 +781,13 @@ export default function App() {
       ) : null}
 
       {editing && showLibrary ? (
-        <ComponentLibrary onPick={addComponent} onClose={() => setShowLibrary(false)} />
+        <ComponentLibrary
+          saved={doc.library}
+          onPick={addComponent}
+          onPickSaved={addSavedComponent}
+          onForgetSaved={(id) => setDoc((d) => ({ ...d, library: d.library.filter((s) => s.id !== id) }))}
+          onClose={() => setShowLibrary(false)}
+        />
       ) : null}
 
       {editing && showData ? (

@@ -77,6 +77,8 @@ export type CommandContext = {
     addSource: (kind: string) => void;
     openLibrary: () => void;
     addComponent: (defId: string) => void;
+    designComponent: (widgetId: string) => void;
+    saveComponent: (widgetId: string) => void;
     openThemes: () => void;
     applyTheme: (themeId: string, restyleComponents: boolean) => void;
     applyTemplate: (templateId: string) => void;
@@ -149,6 +151,26 @@ export function buildCommands(ctx: CommandContext): Command[] {
 
   if (selected && ctx.editing) {
     const name = `“${selected.title}”`;
+    if (selected.type === "component") {
+      cmds.push(
+        {
+          id: "sel.design",
+          label: `Design ${name}`,
+          group: "Selected component",
+          icon: "layers",
+          keywords: "edit layout pieces maker customise customize build",
+          run: () => a.designComponent(selected.id),
+        },
+        {
+          id: "sel.save",
+          label: `Save ${name} to my components`,
+          group: "Selected component",
+          icon: "save",
+          keywords: "library reuse keep template",
+          run: () => a.saveComponent(selected.id),
+        },
+      );
+    }
     const rect = rectFor(selected, ctx.bp);
     cmds.push(
       { id: "sel.edit", label: `Edit ${name}`, group: "Selected component", icon: "pencil", keywords: "open settings change", run: () => a.editWidget(selected.id) },
