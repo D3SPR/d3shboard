@@ -12,7 +12,7 @@ export const WIDGET_CATALOG: { type: WidgetType; label: string; description: str
   { type: "component", label: "Component", description: "A ready-made design from the component library.", icon: "layers" },
 ];
 
-/** The basics shown in the Add menu. Library components are added from their own browser. */
+/** The simple building blocks, shown under "Basics" in the Add dialog. */
 export const ADDABLE_CATALOG = WIDGET_CATALOG.filter((c) => c.type !== "component");
 
 export const catalogEntry = (type: WidgetType) => WIDGET_CATALOG.find((c) => c.type === type)!;

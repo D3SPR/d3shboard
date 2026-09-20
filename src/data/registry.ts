@@ -53,7 +53,7 @@ export const SOURCE_KINDS: SourceKind[] = [
   jsonSource,
 ];
 
-/** The order groups appear in the Add data list. */
+/** The order groups appear on the Add dialog's Data tab. */
 export const SOURCE_GROUPS: SourceGroup[] = [
   "Weather & sky",
   "Markets",

@@ -36,9 +36,8 @@ import { themeById } from "./themes";
 import { buildTemplate, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
-import { ComponentLibrary } from "./ui/ComponentLibrary";
+import { AddDialog, type AddTab } from "./ui/AddDialog";
 import { ComponentMaker } from "./ui/ComponentMaker";
-import { DataDialog } from "./ui/DataDialog";
 import { Icon } from "./ui/icons";
 import { Toolbar, type MenuId } from "./ui/Toolbar";
 import { Welcome } from "./ui/Welcome";
@@ -76,8 +75,8 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showData, setShowData] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
+  // Components and the data behind them live in one "Add" dialog, on two tabs.
+  const [addTab, setAddTab] = useState<AddTab | null>(null);
   const [showThemes, setShowThemes] = useState(false);
   const [makerWidgetId, setMakerWidgetId] = useState<string | null>(null);
   const [lastDeleted, setLastDeleted] = useState<{
@@ -234,7 +233,7 @@ export default function App() {
         panels: d.panels.map((p) => (p.id === d.activePanelId ? { ...p, widgets: [...p.widgets, widget] } : p)),
       }));
       setSelectedId(widget.id);
-      setShowLibrary(false);
+      setAddTab(null);
     },
     [doc.sources, panel.widgets],
   );
@@ -271,7 +270,7 @@ export default function App() {
         panels: d.panels.map((p) => (p.id === d.activePanelId ? { ...p, widgets: [...p.widgets, widget] } : p)),
       }));
       setSelectedId(widget.id);
-      setShowLibrary(false);
+      setAddTab(null);
     },
     [doc.library, doc.sources, panel.widgets],
   );
@@ -466,7 +465,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || showThemes || !!makerWidgetId || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || addTab !== null || showThemes || !!makerWidgetId || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -532,8 +531,7 @@ export default function App() {
     setShowAutomations(false);
     setAnimationsOpen(null);
     setShowAgent(false);
-    setShowData(false);
-    setShowLibrary(false);
+    setAddTab(null);
     setShowThemes(false);
     setMakerWidgetId(null);
     setOpenMenu(null);
@@ -583,8 +581,8 @@ export default function App() {
           resetDoc,
           openAgent: () => setShowAgent(true),
           openTemplates: () => setShowTemplates(true),
-          openData: () => setShowData(true),
-          openLibrary: () => setShowLibrary(true),
+          openData: () => setAddTab("data"),
+          openLibrary: () => setAddTab("components"),
           openThemes: () => setShowThemes(true),
           applyTheme,
           addComponent,
@@ -593,7 +591,7 @@ export default function App() {
           addSource: (kind) => {
             const created = createSource(kind);
             if (created) setDoc((d) => ({ ...d, sources: [...d.sources, created] }));
-            setShowData(true);
+            setAddTab("data");
           },
           applyTemplate,
           setAgentEnabled: (enabled) => bridge.setSettings({ enabled }),
@@ -625,7 +623,6 @@ export default function App() {
           bp={bp}
           setBp={setBpOverride}
           setBoard={patchActivePanel}
-          addType={addType}
           panels={doc.panels}
           activePanelId={doc.activePanelId}
           selectPanel={(id) => setDoc((d) => ({ ...d, activePanelId: id }))}
@@ -641,8 +638,8 @@ export default function App() {
           onReset={resetDoc}
           onHelp={() => setShowWelcome(true)}
           onTemplates={() => setShowTemplates(true)}
-          onData={() => setShowData(true)}
-          onLibrary={() => setShowLibrary(true)}
+          onAdd={() => setAddTab("components")}
+          onData={() => setAddTab("data")}
           onThemes={() => setShowThemes(true)}
           onAgent={() => setShowAgent(true)}
           agentStatus={bridge.status}
@@ -733,7 +730,7 @@ export default function App() {
           onNewAnimation={openNewAnimation}
           onOpenData={() => {
             setEditingWidgetId(null);
-            setShowData(true);
+            setAddTab("data");
           }}
           onDesign={() => {
             setEditingWidgetId(null);
@@ -751,7 +748,7 @@ export default function App() {
           onClose={() => setMakerWidgetId(null)}
           onOpenData={() => {
             setMakerWidgetId(null);
-            setShowData(true);
+            setAddTab("data");
           }}
         />
       ) : null}
@@ -780,18 +777,23 @@ export default function App() {
         <ThemesDialog currentAccent={panel.accent} onPick={applyTheme} onClose={() => setShowThemes(false)} />
       ) : null}
 
-      {editing && showLibrary ? (
-        <ComponentLibrary
+      {editing && addTab ? (
+        <AddDialog
+          tab={addTab}
+          setTab={setAddTab}
           saved={doc.library}
+          sources={doc.sources}
+          setSources={setSources}
+          store={data}
           onPick={addComponent}
           onPickSaved={addSavedComponent}
           onForgetSaved={(id) => setDoc((d) => ({ ...d, library: d.library.filter((s) => s.id !== id) }))}
-          onClose={() => setShowLibrary(false)}
+          onAddBasic={(type) => {
+            addType(type);
+            setAddTab(null);
+          }}
+          onClose={() => setAddTab(null)}
         />
-      ) : null}
-
-      {editing && showData ? (
-        <DataDialog sources={doc.sources} setSources={setSources} store={data} onClose={() => setShowData(false)} />
       ) : null}
 
       {editing && showTemplates ? (

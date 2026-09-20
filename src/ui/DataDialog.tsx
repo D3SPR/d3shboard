@@ -6,7 +6,7 @@ import { fetchJson } from "../data/sources/shared";
 import type { DataStore } from "../data/store";
 import type { DataSource, ParamDef, SourceParams } from "../data/types";
 import { Icon } from "./icons";
-import { Button, Dialog, Disclosure, Field, Intro, Segmented, inputClass } from "./kit";
+import { Button, Disclosure, Field, Intro, Segmented, inputClass } from "./kit";
 
 const ago = (at: number) => {
   if (!at) return "not yet";
@@ -241,16 +241,14 @@ function SourceCard({
   );
 }
 
-export function DataDialog({
+export function DataPanel({
   sources,
   setSources,
   store,
-  onClose,
 }: {
   sources: DataSource[];
   setSources: (next: DataSource[]) => void;
   store: DataStore;
-  onClose: () => void;
 }) {
   const [adding, setAdding] = useState(sources.length === 0);
 
@@ -263,13 +261,7 @@ export function DataDialog({
   };
 
   return (
-    <Dialog
-      title="Data"
-      subtitle="Live information your components can show."
-      icon="data"
-      onClose={onClose}
-      width={560}
-    >
+    <>
       <Intro>
         Add the weather, headlines, scores or the time once here, and any component on any page can show it. Everything
         updates by itself.
@@ -319,6 +311,6 @@ export function DataDialog({
           Add data
         </Button>
       )}
-    </Dialog>
+    </>
   );
 }

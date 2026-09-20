@@ -283,7 +283,7 @@ function Maker({ widget, bp, update, onClose, onOpenData, instance, def }: Maker
           </div>
         ) : (
           <Button icon="data" onClick={onOpenData}>
-            Add some data first
+            Add data first
           </Button>
         )}
       </Section>
@@ -308,7 +308,7 @@ function NodeInspector({ node, setNode }: { node: CompNode; setNode: (n: CompNod
           />
         </Field>
         <Field label="Space between">
-          <Slider value={node.gap ?? 0.4} min={0} max={2} step={0.1} onChange={(gap) => patch({ gap } as Partial<CompNode>)} format={(v) => v.toFixed(1)} />
+          <Slider value={node.gap ?? 0.4} min={0} max={2} step={0.1} onChange={(gap) => patch({ gap } as Partial<CompNode>)} label="Space between" />
         </Field>
         <Field label="Line up" stacked>
           <Segmented
@@ -356,7 +356,7 @@ function NodeInspector({ node, setNode }: { node: CompNode; setNode: (n: CompNod
           <Toggle checked={!!node.caps} onChange={(caps) => patch({ caps } as Partial<CompNode>)} label="Capitals" />
         </Field>
         <Field label="Lines before cutting off" help="0 means never cut it off.">
-          <Slider value={node.lines ?? 0} min={0} max={5} onChange={(lines) => patch({ lines } as Partial<CompNode>)} />
+          <Slider value={node.lines ?? 0} min={0} max={5} onChange={(lines) => patch({ lines } as Partial<CompNode>)} label="Lines before cutting off" />
         </Field>
       </>
     );
@@ -394,7 +394,7 @@ function NodeInspector({ node, setNode }: { node: CompNode; setNode: (n: CompNod
     return (
       <>
         <Field label="Size">
-          <Slider value={node.size ?? 1.6} min={0.6} max={6} step={0.2} onChange={(size) => patch({ size } as Partial<CompNode>)} format={(v) => `${v.toFixed(1)}×`} />
+          <Slider value={node.size ?? 1.6} min={0.6} max={6} step={0.2} onChange={(size) => patch({ size } as Partial<CompNode>)} unit="×" label="Size" />
         </Field>
         <Field label="Fill the space">
           <Toggle checked={!!node.grow} onChange={(grow) => patch({ grow } as Partial<CompNode>)} label="Fill the space" />
@@ -430,7 +430,7 @@ function NodeInspector({ node, setNode }: { node: CompNode; setNode: (n: CompNod
           />
         </Field>
         <Field label="Space between">
-          <Slider value={node.gap ?? 0.4} min={0} max={2} step={0.1} onChange={(gap) => patch({ gap } as Partial<CompNode>)} format={(v) => v.toFixed(1)} />
+          <Slider value={node.gap ?? 0.4} min={0} max={2} step={0.1} onChange={(gap) => patch({ gap } as Partial<CompNode>)} label="Space between" />
         </Field>
         <Field label="Direction" stacked>
           <Segmented

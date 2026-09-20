@@ -1,14 +1,13 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { BRAND } from "../brand";
 import { BREAKPOINTS, FONTS } from "../lib/board";
-import type { Background, BreakpointKey, Panel, RenderBoard, WidgetType } from "../lib/types";
+import type { Background, BreakpointKey, Panel, RenderBoard } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { PALETTE_SHORTCUT } from "../commands/shortcut";
-import { ADDABLE_CATALOG } from "../widgets/catalog";
 import { Icon, Logo, type IconName } from "./icons";
 import { Button, ColorField, Disclosure, Field, Intro, Popover, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
 
-export type MenuId = "add" | "theme" | "screen" | "pages" | "file";
+export type MenuId = "theme" | "screen" | "pages" | "file";
 
 export const NAMED_ACCENTS = [
   { name: "Lavender", color: "#c7b8ff" },
@@ -39,7 +38,6 @@ type Props = {
   bp: BreakpointKey;
   setBp: (bp: BreakpointKey) => void;
   setBoard: (patch: Partial<Panel>) => void;
-  addType: (type: WidgetType) => void;
   panels: Panel[];
   activePanelId: string;
   selectPanel: (id: string) => void;
@@ -56,7 +54,7 @@ type Props = {
   onHelp: () => void;
   onTemplates: () => void;
   onData: () => void;
-  onLibrary: () => void;
+  onAdd: () => void;
   onThemes: () => void;
   onAgent: () => void;
   agentStatus: BridgeStatus;
@@ -102,7 +100,6 @@ export function Toolbar(props: Props) {
   const { board, bp, openMenu: open, setOpenMenu: setOpen } = props;
   const headerRef = useRef<HTMLElement>(null);
   const anchors = {
-    add: useRef<HTMLButtonElement>(null),
     theme: useRef<HTMLButtonElement>(null),
     screen: useRef<HTMLButtonElement>(null),
     pages: useRef<HTMLButtonElement>(null),
@@ -142,8 +139,7 @@ export function Toolbar(props: Props) {
       </div>
 
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-        <ToolButton icon="plus" label="Add" active={open === "add"} onClick={() => toggle("add")} buttonRef={anchors.add} title="Add something to this page" />
-        <ToolButton icon="data" label="Data" onClick={() => { close(); props.onData(); }} title="Weather, headlines, scores and the time" />
+        <ToolButton icon="plus" label="Add" onClick={() => { close(); props.onAdd(); }} title="Components to put on the page, and the live data behind them" />
         <ToolButton icon="palette" label="Theme" active={open === "theme"} onClick={() => toggle("theme")} buttonRef={anchors.theme} title="Colours, font and background" />
         <ToolButton icon={bpIcon} label={bpInfo.label} active={open === "screen"} onClick={() => toggle("screen")} buttonRef={anchors.screen} title="Choose which screen size you're arranging" />
         <ToolButton icon="pages" label="Pages" active={open === "pages"} onClick={() => toggle("pages")} buttonRef={anchors.pages} title="Add or switch between pages" />
@@ -187,9 +183,6 @@ export function Toolbar(props: Props) {
         Done
       </button>
 
-      <Popover anchor={anchors.add} open={open === "add"} width={300}>
-        <AddMenu onAdd={(t) => { props.addType(t); close(); }} onLibrary={() => { close(); props.onLibrary(); }} />
-      </Popover>
       <Popover anchor={anchors.theme} open={open === "theme"} width={320}>
         <ThemeMenu board={board} setBoard={props.setBoard} onThemes={() => { close(); props.onThemes(); }} />
       </Popover>
@@ -207,35 +200,6 @@ export function Toolbar(props: Props) {
         />
       </Popover>
     </header>
-  );
-}
-
-function AddMenu({ onAdd, onLibrary }: { onAdd: (type: WidgetType) => void; onLibrary: () => void }) {
-  return (
-    <>
-      <Intro>Pick something to put on this page. Tap it to add it, or drag it to exactly where you want it.</Intro>
-      <Button variant="primary" icon="layers" className="mb-3 w-full" onClick={onLibrary}>
-        Browse the component library
-      </Button>
-      <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">Basics</p>
-      {ADDABLE_CATALOG.map((item) => (
-        <button
-          key={item.type}
-          draggable
-          onDragStart={(e) => e.dataTransfer.setData("widget/type", item.type)}
-          onClick={() => onAdd(item.type)}
-          className="mb-1.5 flex w-full cursor-grab items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
-        >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-            <Icon name={item.icon} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-medium">{item.label}</span>
-            <span className="block text-[12px] leading-snug text-white/50">{item.description}</span>
-          </span>
-        </button>
-      ))}
-    </>
   );
 }
 
@@ -325,12 +289,12 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
               <ColorField value={bg.color2} onChange={(color2) => setBg({ color2 })} />
             </Field>
             <Field label="Direction" help="Which way the two colours blend into each other.">
-              <Slider value={bg.angle} min={0} max={360} onChange={(angle) => setBg({ angle })} format={(v) => `${v}°`} />
+              <Slider value={bg.angle} min={0} max={360} onChange={(angle) => setBg({ angle })} unit="°" label="Direction" />
             </Field>
           </>
         ) : null}
         <Field label="Darken" help="Puts a dark layer over the background so text on top is easier to read. Handy with busy pictures.">
-          <Slider value={bg.dim} min={0} max={0.8} step={0.05} onChange={(dim) => setBg({ dim })} format={(v) => `${Math.round(v * 100)}%`} />
+          <Slider value={Math.round(bg.dim * 100)} min={0} max={80} step={5} onChange={(v) => setBg({ dim: v / 100 })} unit="%" label="Darken" />
         </Field>
       </Section>
 
@@ -342,7 +306,7 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
           <Toggle checked={board.showGrid} onChange={(showGrid) => setBoard({ showGrid })} label="Show grid dots" />
         </Field>
         <Field label="Spacing" help="Distance between grid dots. Smaller = finer control.">
-          <Slider value={board.gridSize} min={5} max={80} onChange={(gridSize) => setBoard({ gridSize })} format={(v) => `${v}px`} />
+          <Slider value={board.gridSize} min={5} max={80} onChange={(gridSize) => setBoard({ gridSize })} unit="px" label="Spacing" />
         </Field>
       </Disclosure>
     </>

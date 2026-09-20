@@ -3,8 +3,10 @@ import { CATEGORIES, COMPONENTS } from "../components/library";
 import { renderComponent } from "../components/render";
 import type { ComponentCategory, ComponentDef, ComponentInstance, SavedComponent } from "../components/types";
 import { useDataStore } from "../data/store";
+import { ADDABLE_CATALOG } from "../widgets/catalog";
+import type { WidgetType } from "../lib/types";
 import { Icon } from "./icons";
-import { Dialog, Intro, inputClass } from "./kit";
+import { Intro, inputClass } from "./kit";
 
 const PREVIEW = { w: 232, h: 104 };
 
@@ -54,20 +56,23 @@ const asDefinition = (saved: SavedComponent): ComponentDef => ({
   root: saved.tree,
 });
 
-export function ComponentLibrary({
+export function LibraryPanel({
   saved,
   onPick,
   onPickSaved,
   onForgetSaved,
-  onClose,
+  onAddBasic,
+  onDragBasic,
 }: {
   saved: SavedComponent[];
   onPick: (defId: string) => void;
   onPickSaved: (savedId: string) => void;
   onForgetSaved: (savedId: string) => void;
-  onClose: () => void;
+  onAddBasic: (type: WidgetType) => void;
+  /** Lets the dialog get out of the way while something is dragged onto the page. */
+  onDragBasic: (dragging: boolean) => void;
 }) {
-  const [category, setCategory] = useState<ComponentCategory | "All" | "Mine">("All");
+  const [category, setCategory] = useState<ComponentCategory | "All" | "Mine" | "Basics">("All");
   const [query, setQuery] = useState("");
 
   const shown = useMemo(() => {
@@ -80,13 +85,7 @@ export function ComponentLibrary({
   }, [category, query]);
 
   return (
-    <Dialog
-      title="Component library"
-      subtitle="Ready-made designs that fill themselves in with live information."
-      icon="layers"
-      onClose={onClose}
-      width={660}
-    >
+    <>
       <Intro>
         Pick one and it lands on your page, already showing real data. Everything about it can be changed afterwards — or
         deleted, if you change your mind.
@@ -100,7 +99,7 @@ export function ComponentLibrary({
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="flex flex-wrap gap-1.5">
-          {([...(saved.length ? (["Mine"] as const) : []), "All", ...CATEGORIES] as const).map((c) => (
+          {([...(saved.length ? (["Mine"] as const) : []), "All", ...CATEGORIES, "Basics"] as const).map((c) => (
             <button
               key={c}
               onClick={() => setCategory(c)}
@@ -147,8 +146,40 @@ export function ComponentLibrary({
         </div>
       ) : null}
 
+      {category === "All" || category === "Basics" ? (
+        <div className="mb-4">
+          <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">Basics</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ADDABLE_CATALOG.map((item) => (
+              <button
+                key={item.type}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("widget/type", item.type);
+                  onDragBasic(true);
+                }}
+                onDragEnd={() => onDragBasic(false)}
+                onClick={() => onAddBasic(item.type)}
+                className="flex cursor-grab items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                  <Icon name={item.icon} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-medium">{item.label}</span>
+                  <span className="block text-[12px] leading-snug text-white/50">{item.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[12px] leading-relaxed text-white/45">
+            Simple building blocks you fill in yourself. Drag one to drop it exactly where you want it.
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid gap-2.5 sm:grid-cols-2">
-        {category !== "Mine" ? shown.map((def) => (
+        {category !== "Mine" && category !== "Basics" ? shown.map((def) => (
           <button
             key={def.id}
             onClick={() => onPick(def.id)}
@@ -166,7 +197,9 @@ export function ComponentLibrary({
         )) : null}
       </div>
 
-      {!shown.length && category !== "Mine" ? <p className="py-6 text-center text-[13px] text-white/45">Nothing matches that.</p> : null}
-    </Dialog>
+      {!shown.length && category !== "Mine" && category !== "Basics" ? (
+        <p className="py-6 text-center text-[13px] text-white/45">Nothing matches that.</p>
+      ) : null}
+    </>
   );
 }

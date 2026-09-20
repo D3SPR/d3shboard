@@ -617,10 +617,10 @@ function RuleEditor({
       <section>
         <StepHeading n={4} title="Timing" />
         <Field label="How long">
-          <Slider value={rule.timing.duration} min={100} max={10000} step={100} onChange={(duration) => setTiming({ duration })} format={(v) => `${(v / 1000).toFixed(1)}s`} />
+          <Slider value={rule.timing.duration} min={100} max={10000} step={50} onChange={(duration) => setTiming({ duration })} unit="ms" label="How long" />
         </Field>
         <Field label="Wait before starting">
-          <Slider value={rule.timing.delay} min={0} max={5000} step={100} onChange={(delay) => setTiming({ delay })} format={(v) => `${(v / 1000).toFixed(1)}s`} />
+          <Slider value={rule.timing.delay} min={0} max={5000} step={50} onChange={(delay) => setTiming({ delay })} unit="ms" label="Wait first" />
         </Field>
         <Field label="Movement style" help="Changes the feel: smooth, bouncy, robotic… Try Preview to compare." stacked>
           <select className={inputClass} value={rule.timing.easing} onChange={(e) => setTiming({ easing: e.target.value })}>

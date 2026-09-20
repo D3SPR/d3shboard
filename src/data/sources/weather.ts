@@ -184,7 +184,7 @@ export const weatherSource: SourceKind = {
   },
 };
 
-/** Used by the place picker in the Data menu. */
+/** Used by the place picker on the Add dialog's Data tab. */
 export async function searchPlaces(query: string) {
   const data = await fetchJson(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`,

@@ -269,10 +269,10 @@ function ContentTab({ widget, update, onOpenData, onDesign, onSaveToLibrary }: P
             <PresetOrCustom value={s("url")} onChange={(v) => set("url", v)} customPlaceholder="https://…/rss.xml" options={FEEDS} />
           </Field>
           <Field label="Headlines to show">
-            <Slider value={n("count")} min={1} max={20} onChange={(v) => set("count", v)} />
+            <Slider value={n("count")} min={1} max={20} onChange={(v) => set("count", v)} label="Headlines to show" />
           </Field>
           <Field label="Check for news every" help="How often to look for new headlines.">
-            <Slider value={n("refresh")} min={1} max={120} onChange={(v) => set("refresh", v)} format={(v) => `${v} min`} />
+            <Slider value={n("refresh")} min={1} max={120} onChange={(v) => set("refresh", v)} unit="min" label="Check for news every" />
           </Field>
         </>
       );
@@ -391,7 +391,7 @@ function ComponentFields({
         return (
           <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
             {p.kind === "number" ? (
-              <Slider value={Number(value)} min={p.min ?? 1} max={p.max ?? 12} onChange={set} />
+              <Slider value={Number(value)} min={p.min ?? 1} max={p.max ?? 12} onChange={set} label={p.label} />
             ) : p.kind === "select" ? (
               <Segmented
                 value={String(value)}
@@ -414,7 +414,7 @@ function ComponentFields({
         <Button icon="save" title="Save to my components" onClick={onSaveToLibrary} className="px-2.5" />
       </div>
       <p className="mb-3 text-[12px] leading-relaxed text-white/45">
-        Everything this shows updates by itself. Change where the information comes from in the <b>Data</b> menu.
+        Everything this shows updates by itself. Change where the information comes from under <b>Add → Data</b>.
       </p>
     </>
   );
@@ -485,7 +485,7 @@ function ApiFields({ widget, set }: { widget: Widget; set: (k: string, v: string
         </Field>
       </div>
       <Field label="Update every">
-        <Slider value={Number(cfg.refresh ?? 5)} min={1} max={120} onChange={(v) => set("refresh", v)} format={(v) => `${v} min`} />
+        <Slider value={Number(cfg.refresh ?? 5)} min={1} max={120} onChange={(v) => set("refresh", v)} unit="min" label="Check again every" />
       </Field>
     </>
   );
@@ -588,10 +588,10 @@ function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: strin
 
       <Section title="Shape">
         <Field label="Rounded corners">
-          <Slider value={st.radius} min={0} max={60} onChange={(radius) => set({ radius })} format={(v) => `${v}px`} />
+          <Slider value={st.radius} min={0} max={60} onChange={(radius) => set({ radius })} unit="px" label="Rounded corners" />
         </Field>
         <Field label="Border thickness">
-          <Slider value={st.borderWidth} min={0} max={12} onChange={(borderWidth) => set({ borderWidth })} format={(v) => `${v}px`} />
+          <Slider value={st.borderWidth} min={0} max={12} onChange={(borderWidth) => set({ borderWidth })} unit="px" label="Border thickness" />
         </Field>
         <Field
           label={<span className="flex items-center gap-1.5">Space inside {auto ? <AutoTag /> : null}</span>}
@@ -603,7 +603,8 @@ function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: strin
             max={120}
             disabled={auto}
             onChange={(padding) => set({ padding })}
-            format={(v) => `${v}px`}
+            unit="px"
+            label="Space inside"
           />
         </Field>
       </Section>
@@ -629,14 +630,15 @@ function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: strin
             max={240}
             disabled={auto}
             onChange={(fontSize) => set({ fontSize })}
-            format={(v) => `${Math.round(v)}px`}
+            unit="px"
+            label="Size"
           />
         </Field>
         <Field label="Boldness">
-          <Slider value={st.fontWeight} min={100} max={900} step={100} onChange={(fontWeight) => set({ fontWeight })} />
+          <Slider value={st.fontWeight} min={100} max={900} step={100} onChange={(fontWeight) => set({ fontWeight })} label="Thickness" />
         </Field>
         <Field label="Letter spacing">
-          <Slider value={st.letterSpacing} min={-3} max={12} onChange={(letterSpacing) => set({ letterSpacing })} format={(v) => `${v}px`} />
+          <Slider value={st.letterSpacing} min={-3} max={12} onChange={(letterSpacing) => set({ letterSpacing })} unit="px" label="Letter spacing" />
         </Field>
         <Field label={<span className="flex items-center gap-1.5">Line up text {auto ? <AutoTag /> : null}</span>} stacked>
           <Segmented
@@ -669,7 +671,7 @@ function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: strin
           <Toggle checked={st.blur} onChange={(blur) => set({ blur })} label="Frosted glass" />
         </Field>
         <Field label="Fade whole thing" help="Makes the entire component, including its text, partly see-through.">
-          <Slider value={st.opacity} min={0.1} max={1} step={0.05} onChange={(opacity) => set({ opacity })} format={(v) => `${Math.round(v * 100)}%`} />
+          <Slider value={Math.round(st.opacity * 100)} min={10} max={100} step={5} onChange={(v) => set({ opacity: v / 100 })} unit="%" label="See-through" />
         </Field>
       </Section>
     </>

@@ -192,13 +192,19 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
+/**
+ * A slider with the number beside it as a box you can type into, because dragging
+ * to an exact value is miserable. Typing is only applied once it parses and fits
+ * the range, so half-typed numbers (like "-" or "1" on a 10–100 slider) don't jump.
+ */
 export function Slider({
   value,
   min,
   max,
   step = 1,
   onChange,
-  format,
+  unit,
+  label,
   disabled,
 }: {
   value: number;
@@ -206,9 +212,21 @@ export function Slider({
   max: number;
   step?: number;
   onChange: (v: number) => void;
-  format?: (v: number) => string;
+  unit?: string;
+  label?: string;
   disabled?: boolean;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? String(Math.round(value * 1000) / 1000);
+
+  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+
+  const commit = () => {
+    const parsed = Number(draft);
+    if (draft !== null && draft.trim() !== "" && Number.isFinite(parsed)) onChange(clamp(parsed));
+    setDraft(null);
+  };
+
   return (
     <div className={`flex w-full max-w-[220px] items-center gap-2 ${disabled ? "opacity-40" : ""}`}>
       <input
@@ -218,11 +236,38 @@ export function Slider({
         step={step}
         value={value}
         disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+        onChange={(e) => {
+          setDraft(null);
+          onChange(Number(e.target.value));
+        }}
         className="min-w-0 flex-1 disabled:cursor-not-allowed"
       />
-      <span className="w-12 shrink-0 text-right text-[12px] text-white/60 tabular-nums">
-        {format ? format(value) : value}
+      <span className="flex w-[62px] shrink-0 items-center justify-end gap-0.5 rounded-md bg-white/[0.06] px-1.5 py-0.5 focus-within:ring-1 focus-within:ring-[var(--accent)]">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={shown}
+          disabled={disabled}
+          aria-label={label ? `${label}, type a number` : "Type a number"}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const parsed = Number(e.target.value);
+            if (e.target.value.trim() !== "" && Number.isFinite(parsed) && parsed >= min && parsed <= max) onChange(parsed);
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          className="w-full min-w-0 bg-transparent text-right text-[12px] text-white tabular-nums outline-none [appearance:textfield] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        {unit ? <span className="shrink-0 text-[11px] text-white/45">{unit}</span> : null}
       </span>
     </div>
   );

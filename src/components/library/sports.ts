@@ -212,7 +212,7 @@ export const SPORTS_COMPONENTS: ComponentDef[] = [
         ],
         { gap: 0.3, align: "center" },
       ),
-      { limit: "1", empty: "Set a favourite team in the Data menu." },
+      { limit: "1", empty: "Set a favourite team under Add → Data." },
     ),
   },
 ];
