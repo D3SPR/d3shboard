@@ -9,6 +9,20 @@ const itemFields = [
   { key: "link", label: "Link", type: "text" as const, example: "https://example.com/story" },
 ];
 
+const exampleItems = [
+  "Talks continue into a second week",
+  "City approves the new lakefront plan",
+  "Scientists find something unexpected",
+  "Late goal settles the derby",
+  "Markets close higher for a third day",
+].map((title, i) => ({
+  title,
+  source: "BBC News",
+  time: new Date(Date.now() - (i + 1) * 23 * 60_000).toISOString(),
+  image: "",
+  link: "",
+}));
+
 export const newsSource: SourceKind = {
   kind: "news",
   label: "News headlines",
@@ -34,7 +48,7 @@ export const newsSource: SourceKind = {
     },
   ],
   fields: [
-    { key: "items", label: "Headlines", type: "list", of: itemFields, example: [] },
+    { key: "items", label: "Headlines", type: "list", of: itemFields, example: exampleItems },
     { key: "top", label: "Top headline", type: "text", example: "Something happened somewhere" },
     { key: "source", label: "Publication", type: "text", example: "BBC News" },
     { key: "updated", label: "Last updated", type: "time", format: { relative: true }, example: "2026-09-19T17:10:00Z" },

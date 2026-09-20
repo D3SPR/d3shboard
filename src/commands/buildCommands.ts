@@ -1,8 +1,9 @@
 import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
 import type { BoardDoc, BreakpointKey, Panel, Widget, WidgetType } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
-import { WIDGET_CATALOG, catalogEntry } from "../widgets/catalog";
+import { ADDABLE_CATALOG, catalogEntry } from "../widgets/catalog";
 import type { IconName } from "../ui/icons";
+import { COMPONENTS } from "../components/library";
 import { SOURCE_KINDS } from "../data/registry";
 import { TEMPLATES } from "../templates";
 import { BACKGROUND_PRESETS, NAMED_ACCENTS, type MenuId } from "../ui/Toolbar";
@@ -73,6 +74,8 @@ export type CommandContext = {
     openTemplates: () => void;
     openData: () => void;
     addSource: (kind: string) => void;
+    openLibrary: () => void;
+    addComponent: (defId: string) => void;
     applyTemplate: (templateId: string) => void;
     setAgentEnabled: (enabled: boolean) => void;
     undoAgent: () => void;
@@ -89,7 +92,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
   const cmds: Command[] = [];
   const bpLabel = BREAKPOINTS.find((b) => b.key === ctx.bp)!.label;
 
-  for (const item of WIDGET_CATALOG) {
+  for (const item of ADDABLE_CATALOG) {
     cmds.push({
       id: `add.${item.type}`,
       label: `Add ${item.label.toLowerCase()}`,
@@ -97,6 +100,26 @@ export function buildCommands(ctx: CommandContext): Command[] {
       icon: item.icon,
       keywords: `new insert create component widget ${item.type} ${item.description}`,
       run: () => a.addType(item.type),
+    });
+  }
+
+  cmds.push({
+    id: "add.library",
+    label: "Browse the component library",
+    group: "Add",
+    icon: "layers",
+    keywords: "components ready made designs gallery browse catalogue",
+    run: a.openLibrary,
+  });
+  for (const def of COMPONENTS) {
+    cmds.push({
+      id: `add.component.${def.id}`,
+      label: `Add ${def.name.toLowerCase()}`,
+      group: "Add",
+      icon: def.icon,
+      detail: def.category,
+      keywords: `component library ${def.category} ${def.description}`,
+      run: () => a.addComponent(def.id),
     });
   }
 

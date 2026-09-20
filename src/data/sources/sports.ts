@@ -55,6 +55,28 @@ const readGame = (event: any): Game => {
   };
 };
 
+// Stand-ins so library previews look real before a league is chosen.
+const exampleGames = (state: string) =>
+  [
+    ["Bucks", "Bulls", "MIL", "CHI", 104, 98],
+    ["Celtics", "Heat", "BOS", "MIA", 88, 91],
+    ["Nuggets", "Suns", "DEN", "PHX", 77, 72],
+  ].map(([home, away, homeShort, awayShort, homeScore, awayScore]) => ({
+    home,
+    away,
+    homeShort,
+    awayShort,
+    homeScore: state === "pre" ? 0 : homeScore,
+    awayScore: state === "pre" ? 0 : awayScore,
+    homeLogo: "",
+    awayLogo: "",
+    status: state === "in" ? "Q3 4:12" : state === "post" ? "Final" : "Tonight 7:30 PM",
+    startsAt: new Date(Date.now() + 3 * 3600_000).toISOString(),
+    isLive: state === "in" ? "yes" : "no",
+    matchup: `${awayShort} at ${homeShort}`,
+    state,
+  }));
+
 export const sportsSource: SourceKind = {
   kind: "sports",
   label: "Sports scores",
@@ -74,11 +96,11 @@ export const sportsSource: SourceKind = {
   ],
   fields: [
     { key: "league", label: "League name", type: "text", example: "NBA" },
-    { key: "live", label: "Live now", type: "list", of: gameFields, example: [] },
-    { key: "upcoming", label: "Coming up", type: "list", of: gameFields, example: [] },
-    { key: "recent", label: "Final scores", type: "list", of: gameFields, example: [] },
-    { key: "all", label: "Every game today", type: "list", of: gameFields, example: [] },
-    { key: "myTeam", label: "My team's game", type: "list", of: gameFields, hint: "Empty unless a favourite team is set.", example: [] },
+    { key: "live", label: "Live now", type: "list", of: gameFields, example: exampleGames("in") },
+    { key: "upcoming", label: "Coming up", type: "list", of: gameFields, example: exampleGames("pre") },
+    { key: "recent", label: "Final scores", type: "list", of: gameFields, example: exampleGames("post") },
+    { key: "all", label: "Every game today", type: "list", of: gameFields, example: exampleGames("in") },
+    { key: "myTeam", label: "My team's game", type: "list", of: gameFields, hint: "Empty unless a favourite team is set.", example: exampleGames("in").slice(0, 1) },
     { key: "liveCount", label: "How many are live", type: "number", format: { decimals: 0 }, example: 3 },
   ],
   async load(params) {

@@ -43,6 +43,12 @@ export const WIDGET_DEFAULTS: Record<WidgetType, { title: string; w: number; h: 
       refresh: 5,
     },
   },
+  component: {
+    title: "Component",
+    w: 320,
+    h: 180,
+    config: {},
+  },
   embed: {
     title: "Custom code",
     w: 360,

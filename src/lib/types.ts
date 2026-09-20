@@ -1,10 +1,11 @@
+import type { ComponentInstance } from "../components/types";
 import type { DataSource } from "../data/types";
 
 export type BreakpointKey = "sm" | "md" | "lg";
 
 export type Rect = { x: number; y: number; w: number; h: number; hidden: boolean };
 
-export type WidgetType = "clock" | "text" | "image" | "iframe" | "feed" | "api" | "embed";
+export type WidgetType = "clock" | "text" | "image" | "iframe" | "feed" | "api" | "embed" | "component";
 
 export type Shadow = "none" | "soft" | "hard" | "glow";
 export type IdleAnimation = "none" | "float" | "pulse" | "fade" | "slide";
@@ -40,6 +41,8 @@ export type Widget = {
   layouts: Record<BreakpointKey, Rect>;
   style: WidgetStyle;
   config: WidgetConfig;
+  /** Only on type "component": which library design it draws and what fills it. */
+  component?: ComponentInstance;
 };
 
 export type Background = {

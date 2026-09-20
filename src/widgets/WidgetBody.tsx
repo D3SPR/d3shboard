@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ComponentView } from "../components/render";
 import type { Widget } from "../lib/types";
 import { emitWidgetData, formatDate, getPath, useTick } from "../lib/util";
 
@@ -196,6 +197,8 @@ export function WidgetBody({ widget }: { widget: Widget }) {
       return <ApiValue w={widget} />;
     case "embed":
       return <CustomEmbed w={widget} />;
+    case "component":
+      return <ComponentView instance={widget.component} />;
     default:
       return null;
   }

@@ -33,10 +33,12 @@ const writeCache = (key: string, value: Record<string, unknown>) => {
 
 export type DataStore = {
   states: Record<string, SourceState>;
+  /** The dashboard's configured sources, so components can resolve their own slots. */
+  sources: DataSource[];
   refresh: (id?: string) => void;
 };
 
-export const DataContext = createContext<DataStore>({ states: {}, refresh: () => {} });
+export const DataContext = createContext<DataStore>({ states: {}, sources: [], refresh: () => {} });
 
 export const useDataStore = () => useContext(DataContext);
 
@@ -117,5 +119,5 @@ export function useDataSources(sources: DataSource[]): DataStore {
     setNonce((n) => n + 1);
   }, []);
 
-  return useMemo(() => ({ states, refresh }), [states, refresh]);
+  return useMemo(() => ({ states, sources, refresh }), [states, sources, refresh]);
 }

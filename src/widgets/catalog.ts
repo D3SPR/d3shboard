@@ -9,6 +9,10 @@ export const WIDGET_CATALOG: { type: WidgetType; label: string; description: str
   { type: "api", label: "Live number", description: "Show a live value like a price or temperature from a data link.", icon: "gauge" },
   { type: "iframe", label: "Web page", description: "Show a whole website inside a box.", icon: "globe" },
   { type: "embed", label: "Custom code", description: "For tinkerers: write your own HTML and JavaScript.", icon: "code" },
+  { type: "component", label: "Component", description: "A ready-made design from the component library.", icon: "layers" },
 ];
+
+/** The basics shown in the Add menu. Library components are added from their own browser. */
+export const ADDABLE_CATALOG = WIDGET_CATALOG.filter((c) => c.type !== "component");
 
 export const catalogEntry = (type: WidgetType) => WIDGET_CATALOG.find((c) => c.type === type)!;

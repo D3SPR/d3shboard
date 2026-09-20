@@ -58,6 +58,25 @@ const dayFields = [
   { key: "rainChance", label: "Chance of rain", type: "number" as const, format: { unit: "%", decimals: 0 }, example: 60 },
 ];
 
+// Stand-ins so library previews look real before a place is chosen.
+const exampleHours = [0, 1, 2, 3, 4, 5].map((i) => ({
+  time: `2026-09-19T${String(19 + i).padStart(2, "0")}:00`,
+  temp: 68 - i,
+  condition: "Partly cloudy",
+  icon: i > 2 ? "moon" : "cloudSun",
+  rainChance: 10 + i * 5,
+}));
+
+const exampleDays = ["Today", "Sun", "Mon", "Tue", "Wed"].map((day, i) => ({
+  day,
+  date: `2026-09-${20 + i}`,
+  high: 74 - i * 2,
+  low: 58 - i,
+  condition: ["Clear", "Showers", "Overcast", "Clear", "Thunderstorm"][i],
+  icon: ["sun", "rain", "cloud", "sun", "storm"][i],
+  rainChance: [10, 60, 20, 5, 70][i],
+}));
+
 export const weatherSource: SourceKind = {
   kind: "weather",
   label: "Weather",
@@ -92,8 +111,8 @@ export const weatherSource: SourceKind = {
     { key: "sunrise", label: "Sunrise", type: "time", format: { pattern: "h:mm A" }, example: "2026-09-19T06:41" },
     { key: "sunset", label: "Sunset", type: "time", format: { pattern: "h:mm A" }, example: "2026-09-19T19:02" },
     { key: "isDay", label: "Daytime", type: "text", example: "yes" },
-    { key: "hourly", label: "Next hours", type: "list", of: hourFields, example: [] },
-    { key: "daily", label: "Next days", type: "list", of: dayFields, example: [] },
+    { key: "hourly", label: "Next hours", type: "list", of: hourFields, example: exampleHours },
+    { key: "daily", label: "Next days", type: "list", of: dayFields, example: exampleDays },
   ],
   async load(params) {
     const lat = num(params.lat, 43.0389);

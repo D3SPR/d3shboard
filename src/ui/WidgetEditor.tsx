@@ -3,6 +3,8 @@ import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
 import type { AnimationRule, BreakpointKey, IdleAnimation, Rect, RenderBoard, Widget, WidgetStyle } from "../lib/types";
 import { formatDate, listLeafPaths } from "../lib/util";
 import { catalogEntry } from "../widgets/catalog";
+import { definitionFor } from "../components/library";
+import { useDataStore } from "../data/store";
 import { describeRule } from "./AnimationsDialog";
 import { Icon, type IconName } from "./icons";
 import { ACCENT_SWATCHES } from "./Toolbar";
@@ -21,6 +23,7 @@ type Props = {
   duplicate: (id: string) => void;
   onEditAnimation: (ruleId: string) => void;
   onNewAnimation: (widgetId: string) => void;
+  onOpenData: () => void;
 };
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -34,6 +37,10 @@ export function WidgetEditor(props: Props) {
   const { widget, board } = props;
   const [tab, setTab] = useState<Tab>("content");
   const entry = catalogEntry(widget.type);
+  // Library components describe themselves rather than showing the generic "Component".
+  const def = widget.type === "component" ? definitionFor(widget.component?.defId ?? "") : null;
+  const headerIcon = def?.icon ?? entry.icon;
+  const headerLabel = def ? `${def.name} · ${def.category}` : entry.label;
 
   return (
     <Dialog
@@ -42,7 +49,7 @@ export function WidgetEditor(props: Props) {
       header={
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-            <Icon name={entry.icon} />
+            <Icon name={headerIcon} />
           </span>
           <div className="min-w-0 flex-1">
             <label className="flex items-center gap-1.5">
@@ -54,7 +61,7 @@ export function WidgetEditor(props: Props) {
               />
               <Icon name="pencil" size={12} className="shrink-0 opacity-40" />
             </label>
-            <p className="text-[12px] text-white/45">{entry.label}</p>
+            <p className="text-[12px] text-white/45">{headerLabel}</p>
           </div>
         </div>
       }
@@ -164,7 +171,7 @@ const TOKEN_HELP = (
   </>
 );
 
-function ContentTab({ widget, update }: Props) {
+function ContentTab({ widget, update, onOpenData }: Props) {
   const cfg = widget.config;
   const set = (key: string, value: string | number) => update(widget.id, { config: { ...cfg, [key]: value } });
   const s = (key: string) => String(cfg[key] ?? "");
@@ -179,6 +186,7 @@ function ContentTab({ widget, update }: Props) {
     feed: ["url", "count", "refresh"],
     api: ["url", "path", "prefix", "suffix", "refresh"],
     embed: ["html"],
+    component: ["baseW", "baseH"],
   };
   const extras = Object.entries(cfg).filter(([k]) => !known[widget.type].includes(k));
 
@@ -270,6 +278,9 @@ function ContentTab({ widget, update }: Props) {
     case "api":
       fields = <ApiFields widget={widget} set={set} />;
       break;
+    case "component":
+      fields = <ComponentFields widget={widget} update={update} onOpenData={onOpenData} />;
+      break;
     case "embed":
       fields = (
         <Field
@@ -308,6 +319,83 @@ function ContentTab({ widget, update }: Props) {
           ))}
         </Disclosure>
       ) : null}
+    </>
+  );
+}
+
+/** Settings for a component placed from the library: where its data comes from, plus its own options. */
+function ComponentFields({
+  widget,
+  update,
+  onOpenData,
+}: {
+  widget: Widget;
+  update: (id: string, patch: Partial<Widget>) => void;
+  onOpenData: () => void;
+}) {
+  const store = useDataStore();
+  const instance = widget.component;
+  const def = instance ? definitionFor(instance.defId) : null;
+  if (!instance || !def) return <Intro>This component's design is missing. Try deleting it and adding it again.</Intro>;
+
+  const setInstance = (patch: Partial<NonNullable<Widget["component"]>>) =>
+    update(widget.id, { component: { ...instance, ...patch } });
+
+  return (
+    <>
+      <Intro>{def.description}</Intro>
+
+      {def.needs.map((need) => {
+        const choices = store.sources.filter((s) => s.kind === need.kind);
+        const chosen = instance.sources[need.key] ?? "";
+        return (
+          <Field key={need.key} label={need.label} help="Where this component gets its live information." stacked>
+            {choices.length ? (
+              <select
+                className={inputClass}
+                value={chosen}
+                onChange={(e) => setInstance({ sources: { ...instance.sources, [need.key]: e.target.value } })}
+              >
+                {choices.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-[#1b1928]">
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Button icon="data" onClick={onOpenData}>
+                Set this up in Data
+              </Button>
+            )}
+          </Field>
+        );
+      })}
+
+      {(def.params ?? []).map((p) => {
+        const value = instance.params[p.key] ?? p.default;
+        const set = (v: string | number) => setInstance({ params: { ...instance.params, [p.key]: v } });
+        return (
+          <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
+            {p.kind === "number" ? (
+              <Slider value={Number(value)} min={p.min ?? 1} max={p.max ?? 12} onChange={set} />
+            ) : p.kind === "select" ? (
+              <Segmented
+                value={String(value)}
+                onChange={set}
+                options={(p.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
+              />
+            ) : p.kind === "toggle" ? (
+              <Toggle checked={String(value) === "yes"} onChange={(on) => set(on ? "yes" : "no")} label={p.label} />
+            ) : (
+              <input className={inputClass} value={String(value)} onChange={(e) => set(e.target.value)} />
+            )}
+          </Field>
+        );
+      })}
+
+      <p className="mb-3 text-[12px] leading-relaxed text-white/45">
+        Everything this shows updates by itself. Change where the information comes from in the <b>Data</b> menu.
+      </p>
     </>
   );
 }

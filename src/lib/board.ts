@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { BRAND } from "../brand.ts";
+import type { ComponentInstance } from "../components/types";
 import type { DataSource } from "../data/types";
 import type {
   Background,
@@ -59,7 +60,10 @@ const AUTO_BASE = { fontSize: 16, padding: 18 };
 
 export const autoFitScale = (w: Widget, rect: Rect) => {
   const ref = WIDGET_DEFAULTS[w.type];
-  return Math.max(0, Math.min(rect.w / ref.w, rect.h / ref.h));
+  // Library components carry their own reference size, set when they were placed.
+  const baseW = Number(w.config.baseW) || ref.w;
+  const baseH = Number(w.config.baseH) || ref.h;
+  return Math.max(0, Math.min(rect.w / baseW, rect.h / baseH));
 };
 
 export const effectiveStyle = (w: Widget, rect: Rect): WidgetStyle => {
@@ -98,6 +102,25 @@ export const createWidget = (type: WidgetType, x: number, y: number, z: number):
     config: { ...def.config },
   };
 };
+
+export const createComponentWidget = (
+  instance: ComponentInstance,
+  meta: { name: string; w: number; h: number },
+  x: number,
+  y: number,
+  z: number,
+): Widget => ({
+  id: uid(),
+  type: "component",
+  title: meta.name,
+  showTitle: false,
+  z,
+  locked: false,
+  layouts: layoutsFrom(x, y, meta.w, meta.h),
+  style: defaultStyle(),
+  config: { baseW: meta.w, baseH: meta.h },
+  component: instance,
+});
 
 export const rectFor = (w: Widget, bp: BreakpointKey): Rect =>
   w.layouts?.[bp] ?? w.layouts?.lg ?? { x: 40, y: 40, w: 300, h: 180, hidden: false };

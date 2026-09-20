@@ -7,6 +7,7 @@ import { PanelPager } from "./canvas/PanelPager";
 import {
   breakpointFor,
   clonePanel,
+  createComponentWidget,
   createPanel,
   createWidget,
   docHasCustomCode,
@@ -23,6 +24,7 @@ import { useAgentBridge } from "./bridge/useAgentBridge";
 import { DataContext, useDataSources } from "./data/store";
 import type { DataSource } from "./data/types";
 import { createSource } from "./data/registry";
+import { definitionFor } from "./components/library";
 import { buildCommands, type Command } from "./commands/buildCommands";
 import { isPaletteHotkey } from "./commands/shortcut";
 import { AgentDialog } from "./ui/AgentDialog";
@@ -31,6 +33,7 @@ import { TemplatesDialog } from "./ui/TemplatesDialog";
 import { buildTemplatePanel, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
+import { ComponentLibrary } from "./ui/ComponentLibrary";
 import { DataDialog } from "./ui/DataDialog";
 import { Icon } from "./ui/icons";
 import { Toolbar, type MenuId } from "./ui/Toolbar";
@@ -70,6 +73,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showData, setShowData] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -190,6 +194,43 @@ export default function App() {
       setSelectedId(w.id);
     },
     [addWidget, panel.widgets],
+  );
+
+  /** Places a library component, creating any data source it needs that isn't set up yet. */
+  const addComponent = useCallback(
+    (defId: string) => {
+      const def = definitionFor(defId);
+      if (!def) return;
+      const sources = [...doc.sources];
+      const slots: Record<string, string> = {};
+      for (const need of def.needs) {
+        let found = sources.find((s) => s.kind === need.kind);
+        if (!found) {
+          const created = createSource(need.kind);
+          if (created) {
+            sources.push(created);
+            found = created;
+          }
+        }
+        if (found) slots[need.key] = found.id;
+      }
+      const z = Math.max(0, ...panel.widgets.map((w) => w.z)) + 1;
+      const widget = createComponentWidget(
+        { defId, sources: slots, params: {} },
+        { name: def.name, w: def.size.w, h: def.size.h },
+        40,
+        40,
+        z,
+      );
+      setDoc((d) => ({
+        ...d,
+        sources,
+        panels: d.panels.map((p) => (p.id === d.activePanelId ? { ...p, widgets: [...p.widgets, widget] } : p)),
+      }));
+      setSelectedId(widget.id);
+      setShowLibrary(false);
+    },
+    [doc.sources, panel.widgets],
   );
 
   const removeWidget = useCallback(
@@ -356,7 +397,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -402,6 +443,7 @@ export default function App() {
     setAnimationsOpen(null);
     setShowAgent(false);
     setShowData(false);
+    setShowLibrary(false);
     setOpenMenu(null);
   };
 
@@ -450,6 +492,8 @@ export default function App() {
           openAgent: () => setShowAgent(true),
           openTemplates: () => setShowTemplates(true),
           openData: () => setShowData(true),
+          openLibrary: () => setShowLibrary(true),
+          addComponent,
           addSource: (kind) => {
             const created = createSource(kind);
             if (created) setDoc((d) => ({ ...d, sources: [...d.sources, created] }));
@@ -502,6 +546,7 @@ export default function App() {
           onHelp={() => setShowWelcome(true)}
           onTemplates={() => setShowTemplates(true)}
           onData={() => setShowData(true)}
+          onLibrary={() => setShowLibrary(true)}
           onAgent={() => setShowAgent(true)}
           agentStatus={bridge.status}
           onCommands={() => setPaletteOpen(true)}
@@ -589,6 +634,10 @@ export default function App() {
             setAnimationsOpen({ editId: ruleId });
           }}
           onNewAnimation={openNewAnimation}
+          onOpenData={() => {
+            setEditingWidgetId(null);
+            setShowData(true);
+          }}
         />
       ) : null}
 
@@ -610,6 +659,10 @@ export default function App() {
           initialEditId={animationsOpen.editId}
           onClose={() => setAnimationsOpen(null)}
         />
+      ) : null}
+
+      {editing && showLibrary ? (
+        <ComponentLibrary onPick={addComponent} onClose={() => setShowLibrary(false)} />
       ) : null}
 
       {editing && showData ? (

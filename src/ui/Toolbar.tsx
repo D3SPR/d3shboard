@@ -4,7 +4,7 @@ import { BREAKPOINTS, FONTS } from "../lib/board";
 import type { Background, BreakpointKey, Panel, RenderBoard, WidgetType } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { PALETTE_SHORTCUT } from "../commands/shortcut";
-import { WIDGET_CATALOG } from "../widgets/catalog";
+import { ADDABLE_CATALOG } from "../widgets/catalog";
 import { Icon, Logo, type IconName } from "./icons";
 import { Button, ColorField, Disclosure, Field, Intro, Popover, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
 
@@ -56,6 +56,7 @@ type Props = {
   onHelp: () => void;
   onTemplates: () => void;
   onData: () => void;
+  onLibrary: () => void;
   onAgent: () => void;
   agentStatus: BridgeStatus;
   onCommands: () => void;
@@ -186,7 +187,7 @@ export function Toolbar(props: Props) {
       </button>
 
       <Popover anchor={anchors.add} open={open === "add"} width={300}>
-        <AddMenu onAdd={(t) => { props.addType(t); close(); }} />
+        <AddMenu onAdd={(t) => { props.addType(t); close(); }} onLibrary={() => { close(); props.onLibrary(); }} />
       </Popover>
       <Popover anchor={anchors.theme} open={open === "theme"} width={320}>
         <ThemeMenu board={board} setBoard={props.setBoard} />
@@ -208,11 +209,15 @@ export function Toolbar(props: Props) {
   );
 }
 
-function AddMenu({ onAdd }: { onAdd: (type: WidgetType) => void }) {
+function AddMenu({ onAdd, onLibrary }: { onAdd: (type: WidgetType) => void; onLibrary: () => void }) {
   return (
     <>
       <Intro>Pick something to put on this page. Tap it to add it, or drag it to exactly where you want it.</Intro>
-      {WIDGET_CATALOG.map((item) => (
+      <Button variant="primary" icon="layers" className="mb-3 w-full" onClick={onLibrary}>
+        Browse the component library
+      </Button>
+      <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">Basics</p>
+      {ADDABLE_CATALOG.map((item) => (
         <button
           key={item.type}
           draggable
