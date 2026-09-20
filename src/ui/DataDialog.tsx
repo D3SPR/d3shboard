@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { formatValue } from "../data/format";
-import { SOURCE_GROUPS, createSource, kindsInGroup, sourceKind } from "../data/registry";
+import { sourceKind } from "../data/registry";
 import { searchPlaces } from "../data/sources/weather";
 import { fetchJson } from "../data/sources/shared";
 import type { DataStore } from "../data/store";
@@ -250,18 +250,11 @@ export function DataPanel({
   setSources: (next: DataSource[]) => void;
   store: DataStore;
 }) {
-  const add = (kind: string) => {
-    const created = createSource(kind);
-    if (!created) return;
-    const taken = sources.filter((s) => s.kind === kind).length;
-    setSources([...sources, { ...created, name: taken ? `${created.name} ${taken + 1}` : created.name }]);
-  };
-
   return (
     <>
       <Intro>
-        Add the weather, headlines, scores or the time once here, and any component on any page can show it. Everything
-        updates by itself.
+        This is the live information your components are showing. Everything here updates by itself — change where it
+        points and every component using it follows.
       </Intro>
 
       {sources.map((s) => (
@@ -274,36 +267,12 @@ export function DataPanel({
         />
       ))}
 
-      <div className="mt-1">
-        <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">
-          {sources.length ? "Add more" : "What you can add"}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <p className="text-[12.5px] leading-relaxed text-white/60">
+          {sources.length
+            ? "Data arrives when you add a component that shows it — from the Components tab, or by dropping a value into a component you're designing. Nothing is kept here that nothing is using."
+            : "Nothing yet. Add a component from the Components tab, or design one and drop a value into it, and the data it needs appears here ready to point wherever you like."}
         </p>
-        {SOURCE_GROUPS.map((group) => {
-          const kinds = kindsInGroup(group);
-          if (!kinds.length) return null;
-          return (
-            <div key={group} className="mb-4">
-              <p className="mb-2 text-[12px] font-medium text-white/55">{group}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {kinds.map((k) => (
-                  <button
-                    key={k.kind}
-                    onClick={() => add(k.kind)}
-                    className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
-                  >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-                      <Icon name={k.icon} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[13px] font-medium">{k.label}</span>
-                      <span className="block text-[12px] leading-snug text-white/50">{k.description}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </>
   );

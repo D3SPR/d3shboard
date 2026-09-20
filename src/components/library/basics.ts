@@ -7,29 +7,29 @@ export const BASIC_COMPONENTS: ComponentDef[] = [
   {
     id: "blank.value",
     name: "Pick your own value",
-    description: "A label and one value. Choose any variable you like in the designer.",
+    description: "A label and one value, ready to point at anything in your data.",
     icon: "pointer",
     category: "Text & shapes",
     size: { w: 300, h: 160 },
     needs: [],
     params: [{ key: "label", label: "Label", kind: "text", default: "Pick a value" }],
-    root: col(
-      [
-        text(param("label"), { size: "xs", color: "accent", caps: true, weight: 600 }),
-        text("—", { size: "2xl", weight: 700 }),
+    root: {
+      kind: "canvas",
+      items: [
+        { id: "label", x: 0.06, y: 0.12, w: 0.88, h: 0.2, align: "center", node: text(param("label"), { scale: 0.8, color: "accent", caps: true, weight: 600 }) },
+        { id: "value", x: 0.06, y: 0.38, w: 0.88, h: 0.42, align: "center", node: text("—", { scale: 2.6, weight: 700 }) },
       ],
-      { gap: 0.25, align: "center" },
-    ),
+    },
   },
   {
     id: "blank.row",
     name: "Build your own",
-    description: "An empty card. Open the designer and add exactly the pieces and values you want.",
+    description: "An empty card. Drop in exactly the values you want and drag them where you like.",
     icon: "layers",
     category: "Text & shapes",
     size: { w: 340, h: 200 },
     needs: [],
-    root: col([text("Open the designer to build this", { size: "sm", color: "muted" })], { gap: 0.3, justify: "center", align: "center" }),
+    root: { kind: "canvas", items: [] },
   },
   {
     id: "number.big",

@@ -80,6 +80,7 @@ export default function App() {
   const [addTab, setAddTab] = useState<AddTab | null>(null);
   const [showThemes, setShowThemes] = useState(false);
   const [makerWidgetId, setMakerWidgetId] = useState<string | null>(null);
+  const [editorTab, setEditorTab] = useState<"content" | "look" | "position" | "motion">("content");
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -120,6 +121,19 @@ export default function App() {
     [data],
   );
 
+  /** Used by the designer: pick a value, get its data set up in the same breath. */
+  const ensureSource = useCallback(
+    (kind: string) => {
+      const existing = doc.sources.find((s) => s.kind === kind);
+      if (existing) return existing.id;
+      const created = createSource(kind);
+      if (!created) return "";
+      setDoc((d) => (d.sources.some((s) => s.kind === kind) ? d : { ...d, sources: [...d.sources, created] }));
+      return created.id;
+    },
+    [doc.sources],
+  );
+
   const setSources = useCallback(
     (sources: DataSource[]) => setDoc((d) => ({ ...d, sources })),
     [],
@@ -144,6 +158,22 @@ export default function App() {
   }, []);
 
   useEffect(() => saveDoc(doc), [doc]);
+
+  // Data exists because something shows it. Once the last component using a source is
+  // gone, so is the source — no invisible list of things quietly fetching in the background.
+  useEffect(() => {
+    const used = new Set(doc.panels.flatMap((p) => p.widgets).flatMap((w) => Object.values(w.component?.sources ?? {})));
+    if (doc.sources.every((s) => used.has(s.id))) return;
+    const timer = setTimeout(
+      () => setDoc((d) => {
+        const live = new Set(d.panels.flatMap((p) => p.widgets).flatMap((w) => Object.values(w.component?.sources ?? {})));
+        return d.sources.every((s) => live.has(s.id)) ? d : { ...d, sources: d.sources.filter((s) => live.has(s.id)) };
+      }),
+      // A moment's grace: the designer creates a source, then binds it on the next tick.
+      1500,
+    );
+    return () => clearTimeout(timer);
+  }, [doc]);
 
   const editing = doc.mode === "edit";
   const bp = editing ? (bpOverride ?? windowBp) : windowBp;
@@ -263,6 +293,8 @@ export default function App() {
       }));
       setSelectedId(widget.id);
       setAddTab(null);
+      // A blank card is no use until you put something on it, so the designer opens with it.
+      if (!def.needs.length && (def.root.kind === "canvas" ? def.root.items.length === 0 : false)) setMakerWidgetId(widget.id);
     },
     [doc.sources, panel.widgets],
   );
@@ -447,6 +479,31 @@ export default function App() {
     [panel.widgets, editingWidgetId],
   );
 
+  const makerWidget = useMemo(
+    () => panel.widgets.find((w) => w.id === makerWidgetId) ?? null,
+    [panel.widgets, makerWidgetId],
+  );
+
+  /** Components open straight in the designer; the simpler widget types keep their form. */
+  const openWidget = useCallback(
+    (id: string | null) => {
+      if (!id) {
+        setEditingWidgetId(null);
+        setMakerWidgetId(null);
+        return;
+      }
+      const target = doc.panels.flatMap((p) => p.widgets).find((w) => w.id === id);
+      if (target?.type === "component") {
+        setMakerWidgetId(id);
+        setEditingWidgetId(null);
+      } else {
+        setEditorTab("content");
+        setEditingWidgetId(id);
+      }
+    },
+    [doc.panels],
+  );
+
   const setAnimations = (rules: AnimationRule[]) => patchActivePanel({ animations: rules });
 
   const openNewAnimation = (widgetId?: string) => {
@@ -584,7 +641,7 @@ export default function App() {
         actions: {
           addType,
           openMenu: setOpenMenu,
-          editWidget: setEditingWidgetId,
+          editWidget: openWidget,
           selectWidget: setSelectedId,
           duplicateWidget,
           removeWidget: deleteWithUndo,
@@ -688,7 +745,7 @@ export default function App() {
             bp={bp}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onEdit={setEditingWidgetId}
+            onEdit={openWidget}
             updateRect={updateRect}
             add={addWidget}
           />
@@ -758,6 +815,7 @@ export default function App() {
             setAnimationsOpen({ editId: ruleId });
           }}
           onNewAnimation={openNewAnimation}
+          initialTab={editorTab}
           onOpenData={() => {
             setEditingWidgetId(null);
             setAddTab("data");
@@ -770,15 +828,17 @@ export default function App() {
         />
       ) : null}
 
-      {editing && makerWidgetId ? (
+      {editing && makerWidget ? (
         <ComponentMaker
-          widget={panel.widgets.find((w) => w.id === makerWidgetId) ?? panel.widgets[0]}
+          widget={makerWidget}
           bp={bp}
           update={updateWidget}
+          ensureSource={ensureSource}
           onClose={() => setMakerWidgetId(null)}
-          onOpenData={() => {
+          onOpenSettings={(tab) => {
             setMakerWidgetId(null);
-            setAddTab("data");
+            setEditorTab(tab === "position" ? "position" : "motion");
+            setEditingWidgetId(makerWidget.id);
           }}
         />
       ) : null}

@@ -150,6 +150,20 @@ export function LibraryPanel({
         <div className="mb-4">
           <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">Basics</p>
           <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              onClick={() => onPick("blank.row")}
+              className="flex items-start gap-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/[0.07] p-2.5 text-left transition hover:border-[var(--accent)] hover:bg-[var(--accent)]/[0.12]"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/20 text-[var(--accent)]">
+                <Icon name="layers" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium">Build your own</span>
+                <span className="block text-[12px] leading-snug text-white/50">
+                  An empty card. Drop in the values you want and drag them where you like.
+                </span>
+              </span>
+            </button>
             {ADDABLE_CATALOG.map((item) => (
               <button
                 key={item.type}

@@ -26,6 +26,7 @@ type Props = {
   onOpenData: () => void;
   onDesign: () => void;
   onSaveToLibrary: () => void;
+  initialTab?: Tab;
 };
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -37,7 +38,7 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 
 export function WidgetEditor(props: Props) {
   const { widget, board } = props;
-  const [tab, setTab] = useState<Tab>("content");
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? "content");
   const entry = catalogEntry(widget.type);
   // Library components describe themselves rather than showing the generic "Component".
   const def = widget.type === "component" ? definitionFor(widget.component?.defId ?? "") : null;

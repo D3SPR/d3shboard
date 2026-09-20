@@ -19,7 +19,23 @@ export type Value =
   | { bind: string; path: string; format?: FormatDef }
   | { param: string };
 
+/**
+ * A piece placed freely on the component's own little canvas. Positions are
+ * fractions of the component box, so everything scales with it.
+ */
+export type CanvasItem = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** How the piece sits inside its own box. */
+  align?: Align;
+  node: CompNode;
+};
+
 export type CompNode =
+  | { kind: "canvas"; items: CanvasItem[] }
   | {
       kind: "stack";
       dir: "row" | "col";
@@ -37,14 +53,20 @@ export type CompNode =
       kind: "text";
       value: Value;
       size?: SizeToken;
+      /** Exact size, as a multiple of the component's text size. Wins over `size`. */
+      scale?: number;
       weight?: number;
       color?: ColorRole;
+      /** A colour of this piece's own, overriding the role and the component's. */
+      tint?: string;
+      /** A font of this piece's own, overriding the component's. */
+      font?: string;
       opacity?: number;
       caps?: boolean;
       lines?: number;
       grow?: boolean;
     }
-  | { kind: "icon"; value: Value; size?: SizeToken; color?: ColorRole }
+  | { kind: "icon"; value: Value; size?: SizeToken; scale?: number; color?: ColorRole; tint?: string }
   | { kind: "image"; value: Value; size?: number; radius?: number; fit?: "cover" | "contain"; grow?: boolean }
   | { kind: "bar"; value: Value; max?: Value; color?: ColorRole }
   | { kind: "divider" }

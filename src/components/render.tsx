@@ -97,8 +97,37 @@ function listFor(node: Extract<CompNode, { kind: "repeat" }>, ctx: Ctx) {
 const truthy = (found: Found) =>
   !found.missing && found.text !== MISSING && !["no", "0", "false", ""].includes(String(found.raw).toLowerCase());
 
+/** A colour role, or a colour of the piece's own. */
+const colourOf = (role: ColorRole | undefined, tint: string | undefined) => tint || COLORS[role ?? "text"];
+
 function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
   switch (node.kind) {
+    case "canvas":
+      return (
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          {node.items.map((item) => (
+            <div
+              key={item.id}
+              data-canvas-item={item.id}
+              style={{
+                position: "absolute",
+                left: `${item.x * 100}%`,
+                top: `${item.y * 100}%`,
+                width: `${item.w * 100}%`,
+                height: `${item.h * 100}%`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: FLEX[item.align ?? "start"],
+                overflow: "hidden",
+                minWidth: 0,
+              }}
+            >
+              <Node node={item.node} ctx={ctx} />
+            </div>
+          ))}
+        </div>
+      );
+
     case "stack": {
       const style: CSSProperties = {
         display: "flex",
@@ -129,9 +158,10 @@ function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
       return (
         <div
           style={{
-            fontSize: `${SIZES[node.size ?? "md"]}em`,
+            fontSize: `${node.scale ?? SIZES[node.size ?? "md"]}em`,
+            fontFamily: node.font ? `"${node.font}", system-ui` : undefined,
             fontWeight: node.weight,
-            color: COLORS[node.color ?? "text"],
+            color: colourOf(node.color, node.tint),
             opacity: node.opacity ?? (node.color === "muted" ? 0.62 : undefined),
             textTransform: node.caps ? "uppercase" : undefined,
             letterSpacing: node.caps ? "0.08em" : undefined,
@@ -152,12 +182,12 @@ function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
 
     case "icon": {
       const name = resolve(node.value, ctx).raw;
-      const em = SIZES[node.size ?? "md"];
+      const em = node.scale ?? SIZES[node.size ?? "md"];
       if (typeof name !== "string" || !name) return null;
       return (
         <Icon
           name={name as IconName}
-          style={{ width: `${em}em`, height: `${em}em`, color: COLORS[node.color ?? "text"], flexShrink: 0 }}
+          style={{ width: `${em}em`, height: `${em}em`, color: colourOf(node.color, node.tint), flexShrink: 0 }}
         />
       );
     }
@@ -496,11 +526,12 @@ export function ComponentView({ instance, widgetId }: { instance: ComponentInsta
   const def = instance ? definitionFor(instance.defId) : null;
   if (!instance || !def)
     return <div style={{ opacity: 0.5, fontSize: "0.9em" }}>This component isn't set up yet.</div>;
+  const freeform = (instance.tree ?? def.root).kind === "canvas";
   return (
-    // Components position themselves with stacks, so they ignore the card's own text alignment.
+    // Components position themselves, so they ignore the card's own text alignment.
     <div
       style={{
-        display: "flex",
+        display: freeform ? "block" : "flex",
         height: "100%",
         width: "100%",
         minWidth: 0,
