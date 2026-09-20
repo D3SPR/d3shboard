@@ -193,14 +193,11 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 }
 
 /**
- * A slider with the number beside it as a box you can type into, because dragging
- * to an exact value is miserable. Typing is only applied once it parses and fits
- * the range, so half-typed numbers (like "-" or "1" on a 10–100 slider) don't jump.
+ * A number you type. No track to drag and no ceiling — if you want a 400px radius
+ * or a 2000px font, that's your business.
  */
-export function Slider({
+export function NumberField({
   value,
-  min,
-  max,
   step = 1,
   onChange,
   unit,
@@ -208,68 +205,48 @@ export function Slider({
   disabled,
 }: {
   value: number;
-  min: number;
-  max: number;
   step?: number;
   onChange: (v: number) => void;
   unit?: string;
   label?: string;
   disabled?: boolean;
 }) {
+  // While typing, the box keeps what was typed — "-" and "1." aren't numbers yet.
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? String(Math.round(value * 1000) / 1000);
 
-  const clamp = (n: number) => Math.min(max, Math.max(min, n));
-
   const commit = () => {
     const parsed = Number(draft);
-    if (draft !== null && draft.trim() !== "" && Number.isFinite(parsed)) onChange(clamp(parsed));
+    if (draft !== null && draft.trim() !== "" && Number.isFinite(parsed)) onChange(parsed);
     setDraft(null);
   };
 
   return (
-    <div className={`flex w-full max-w-[220px] items-center gap-2 ${disabled ? "opacity-40" : ""}`}>
+    <span
+      className={`flex w-[120px] items-center justify-end gap-1 rounded-lg border border-white/10 bg-white/[0.06] px-2 py-1.5 focus-within:border-[var(--accent)] ${disabled ? "pointer-events-none opacity-40" : ""}`}
+    >
       <input
-        type="range"
-        min={min}
-        max={max}
+        type="number"
         step={step}
-        value={value}
+        value={shown}
         disabled={disabled}
         aria-label={label}
         onChange={(e) => {
-          setDraft(null);
-          onChange(Number(e.target.value));
+          setDraft(e.target.value);
+          const parsed = Number(e.target.value);
+          if (e.target.value.trim() !== "" && Number.isFinite(parsed)) onChange(parsed);
         }}
-        className="min-w-0 flex-1 disabled:cursor-not-allowed"
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          commit();
+          (e.target as HTMLInputElement).blur();
+        }}
+        className="w-full min-w-0 bg-transparent text-right text-[13px] text-white tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
       />
-      <span className="flex w-[62px] shrink-0 items-center justify-end gap-0.5 rounded-md bg-white/[0.06] px-1.5 py-0.5 focus-within:ring-1 focus-within:ring-[var(--accent)]">
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={shown}
-          disabled={disabled}
-          aria-label={label ? `${label}, type a number` : "Type a number"}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            const parsed = Number(e.target.value);
-            if (e.target.value.trim() !== "" && Number.isFinite(parsed) && parsed >= min && parsed <= max) onChange(parsed);
-          }}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commit();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          className="w-full min-w-0 bg-transparent text-right text-[12px] text-white tabular-nums outline-none [appearance:textfield] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
-        />
-        {unit ? <span className="shrink-0 text-[11px] text-white/45">{unit}</span> : null}
-      </span>
-    </div>
+      {unit ? <span className="shrink-0 text-[11.5px] text-white/45">{unit}</span> : null}
+    </span>
   );
 }
 
@@ -302,16 +279,11 @@ export function ColorField({
     <div className="flex w-full flex-col items-end gap-2">
       <div className="flex w-full items-center justify-end gap-2">
         {withAlpha && parsed ? (
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={parsed.alpha}
-            title="How see-through it is"
-            aria-label="Transparency"
-            onChange={(e) => onChange(toHex8(parsed.rgb, Number(e.target.value)))}
-            className="w-24"
+          <NumberField
+            value={Math.round(parsed.alpha * 100)}
+            unit="%"
+            label="How see-through it is"
+            onChange={(v) => onChange(toHex8(parsed.rgb, v / 100))}
           />
         ) : null}
         {parsed ? (

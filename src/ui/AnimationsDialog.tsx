@@ -14,7 +14,7 @@ import type {
   Widget,
 } from "../lib/types";
 import { Icon, type IconName } from "./icons";
-import { Button, ColorField, Dialog, Disclosure, Field, Help, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
+import { Button, ColorField, Dialog, Disclosure, Field, Help, Intro, Section, Segmented, NumberField, Toggle, inputClass } from "./kit";
 
 type TriggerKind = AnimationTrigger["kind"];
 
@@ -522,7 +522,6 @@ function RuleEditor({
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                min={1}
                 className={`${inputClass} w-20`}
                 value={t.seconds}
                 onChange={(e) => onChange({ trigger: { ...t, seconds: Math.max(1, Number(e.target.value)) } })}
@@ -617,10 +616,10 @@ function RuleEditor({
       <section>
         <StepHeading n={4} title="Timing" />
         <Field label="How long">
-          <Slider value={rule.timing.duration} min={100} max={10000} step={50} onChange={(duration) => setTiming({ duration })} unit="ms" label="How long" />
+          <NumberField value={rule.timing.duration} step={50} onChange={(duration) => setTiming({ duration })} unit="ms" label="How long" />
         </Field>
         <Field label="Wait before starting">
-          <Slider value={rule.timing.delay} min={0} max={5000} step={50} onChange={(delay) => setTiming({ delay })} unit="ms" label="Wait first" />
+          <NumberField value={rule.timing.delay} step={50} onChange={(delay) => setTiming({ delay })} unit="ms" label="Wait first" />
         </Field>
         <Field label="Movement style" help="Changes the feel: smooth, bouncy, robotic… Try Preview to compare." stacked>
           <select className={inputClass} value={rule.timing.easing} onChange={(e) => setTiming({ easing: e.target.value })}>

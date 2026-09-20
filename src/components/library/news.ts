@@ -3,7 +3,7 @@ import type { ComponentDef } from "../types";
 
 const needs = [{ key: "news", kind: "news", label: "News headlines" }];
 
-const countParam = { key: "count", label: "How many headlines", kind: "number" as const, min: 1, max: 12, default: 5 };
+const countParam = { key: "count", label: "How many headlines", kind: "number" as const, default: 5 };
 
 export const NEWS_COMPONENTS: ComponentDef[] = [
   {

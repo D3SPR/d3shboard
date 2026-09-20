@@ -127,8 +127,6 @@ export type ComponentParam = {
   hint?: string;
   kind: "number" | "text" | "select" | "toggle";
   options?: { value: string; label: string }[];
-  min?: number;
-  max?: number;
   default: string | number;
 };
 

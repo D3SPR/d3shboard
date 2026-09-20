@@ -42,7 +42,9 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
     return () => observer.disconnect();
   }, []);
 
-  const snap = (v: number) => (board.snap ? Math.round(v / board.gridSize) * board.gridSize : Math.round(v));
+  // A grid of zero would divide by zero, and people can type any number now.
+  const grid = Math.max(1, board.gridSize || 1);
+  const snap = (v: number) => (board.snap ? Math.round(v / grid) * grid : Math.round(v));
 
   /** Pointer movement is in screen pixels; the page is in stage units. */
   const toStage = (px: number) => px / scale;
@@ -157,7 +159,7 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
           className="pointer-events-none absolute inset-0 opacity-60"
           style={{
             backgroundImage: `radial-gradient(circle, ${board.accent}33 1px, transparent 1px)`,
-            backgroundSize: `${board.gridSize}px ${board.gridSize}px`,
+            backgroundSize: `${grid}px ${grid}px`,
           }}
         />
       ) : null}

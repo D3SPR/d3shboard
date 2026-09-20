@@ -63,7 +63,7 @@ export const WEATHER_COMPONENTS: ComponentDef[] = [
     category: "Weather",
     size: { w: 460, h: 160 },
     needs,
-    params: [{ key: "count", label: "How many hours", kind: "number", min: 2, max: 12, default: 6 }],
+    params: [{ key: "count", label: "How many hours", kind: "number", default: 6 }],
     root: col(
       [
         text("Next hours", { size: "xs", color: "muted", caps: true, weight: 600 }),
@@ -92,7 +92,7 @@ export const WEATHER_COMPONENTS: ComponentDef[] = [
     category: "Weather",
     size: { w: 360, h: 300 },
     needs,
-    params: [{ key: "count", label: "How many days", kind: "number", min: 2, max: 7, default: 5 }],
+    params: [{ key: "count", label: "How many days", kind: "number", default: 5 }],
     root: repeat(
       "weather",
       "daily",

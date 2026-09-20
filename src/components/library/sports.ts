@@ -3,7 +3,7 @@ import type { ComponentDef } from "../types";
 
 const needs = [{ key: "sports", kind: "sports", label: "Sports scores" }];
 
-const countParam = { key: "count", label: "How many games", kind: "number" as const, min: 1, max: 10, default: 4 };
+const countParam = { key: "count", label: "How many games", kind: "number" as const, default: 4 };
 
 /** One game as a line: away badge and code, score, home badge and code. */
 const scoreLine = (withScores: boolean) =>
@@ -65,7 +65,7 @@ export const SPORTS_COMPONENTS: ComponentDef[] = [
     category: "Sports",
     size: { w: 400, h: 300 },
     needs: standings,
-    params: [{ key: "count", label: "How many teams", kind: "number", min: 3, max: 12, default: 8 }],
+    params: [{ key: "count", label: "How many teams", kind: "number", default: 8 }],
     root: col(
       [
         text(bind("standings", "league"), { size: "xs", color: "accent", caps: true, weight: 700 }),
@@ -112,7 +112,7 @@ export const SPORTS_COMPONENTS: ComponentDef[] = [
     category: "Sports",
     size: { w: 340, h: 280 },
     needs: [{ key: "f1", kind: "f1", label: "Formula 1" }],
-    params: [{ key: "count", label: "How many drivers", kind: "number", min: 3, max: 10, default: 6 }],
+    params: [{ key: "count", label: "How many drivers", kind: "number", default: 6 }],
     root: repeat(
       "f1",
       "standings",

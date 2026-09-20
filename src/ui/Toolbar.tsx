@@ -5,7 +5,7 @@ import type { Background, BreakpointKey, Panel, RenderBoard, Screen } from "../l
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { PALETTE_SHORTCUT } from "../commands/shortcut";
 import { Icon, Logo, type IconName } from "./icons";
-import { Button, ColorField, Disclosure, Field, Intro, Popover, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
+import { Button, ColorField, Disclosure, Field, Intro, Popover, Section, Segmented, NumberField, Toggle, inputClass } from "./kit";
 
 export type MenuId = "theme" | "screen" | "pages" | "more";
 
@@ -287,12 +287,12 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
               <ColorField value={bg.color2} onChange={(color2) => setBg({ color2 })} />
             </Field>
             <Field label="Direction" help="Which way the two colours blend into each other.">
-              <Slider value={bg.angle} min={0} max={360} onChange={(angle) => setBg({ angle })} unit="°" label="Direction" />
+              <NumberField value={bg.angle} onChange={(angle) => setBg({ angle })} unit="°" label="Direction" />
             </Field>
           </>
         ) : null}
         <Field label="Darken" help="Puts a dark layer over the background so text on top is easier to read. Handy with busy pictures.">
-          <Slider value={Math.round(bg.dim * 100)} min={0} max={80} step={5} onChange={(v) => setBg({ dim: v / 100 })} unit="%" label="Darken" />
+          <NumberField value={Math.round(bg.dim * 100)} step={5} onChange={(v) => setBg({ dim: v / 100 })} unit="%" label="Darken" />
         </Field>
       </Section>
 
@@ -304,7 +304,7 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
           <Toggle checked={board.showGrid} onChange={(showGrid) => setBoard({ showGrid })} label="Show grid dots" />
         </Field>
         <Field label="Spacing" help="Distance between grid dots. Smaller = finer control.">
-          <Slider value={board.gridSize} min={5} max={80} onChange={(gridSize) => setBoard({ gridSize })} unit="px" label="Spacing" />
+          <NumberField value={board.gridSize} onChange={(gridSize) => setBoard({ gridSize })} unit="px" label="Spacing" />
         </Field>
       </Disclosure>
     </>

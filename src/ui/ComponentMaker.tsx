@@ -23,7 +23,7 @@ import { FONTS, rectFor } from "../lib/board";
 import type { AnimationRule, BreakpointKey, Rect, Screen, Widget, WidgetStyle } from "../lib/types";
 import { Icon, type IconName } from "./icons";
 import { ACCENT_SWATCHES } from "./Toolbar";
-import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
+import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, NumberField, Toggle, inputClass } from "./kit";
 
 const PREVIEW = { w: 560, h: 340 };
 const HANDLES = ["nw", "ne", "sw", "se"] as const;
@@ -118,7 +118,8 @@ function Maker({
   // Pieces are stored as fractions of the card, but dragging and snapping work in the
   // card's own pixels — the same feel as moving things around the page itself.
   const inner = { w: Math.max(40, rect.w - style.padding * 2), h: Math.max(40, rect.h - style.padding * 2) };
-  const snapPx = (n: number) => (snapOn ? Math.round(n / gridSize) * gridSize : Math.round(n));
+  const grid = Math.max(1, gridSize || 1);
+  const snapPx = (n: number) => (snapOn ? Math.round(n / grid) * grid : Math.round(n));
   const toFraction = (box: { x: number; y: number; w: number; h: number }) =>
     clampBox({ x: box.x / inner.w, y: box.y / inner.h, w: box.w / inner.w, h: box.h / inner.h });
 
@@ -144,14 +145,14 @@ function Maker({
         x = origin.x + dx;
         y = origin.y + dy;
       } else {
-        if (mode.includes("e")) w = Math.max(gridSize * 2, origin.w + dx);
-        if (mode.includes("s")) h = Math.max(gridSize * 2, origin.h + dy);
+        if (mode.includes("e")) w = Math.max(grid * 2, origin.w + dx);
+        if (mode.includes("s")) h = Math.max(grid * 2, origin.h + dy);
         if (mode.includes("w")) {
-          w = Math.max(gridSize * 2, origin.w - dx);
+          w = Math.max(grid * 2, origin.w - dx);
           x = origin.x + (origin.w - w);
         }
         if (mode.includes("n")) {
-          h = Math.max(gridSize * 2, origin.h - dy);
+          h = Math.max(grid * 2, origin.h - dy);
           y = origin.y + (origin.h - h);
         }
       }
@@ -265,7 +266,7 @@ function Maker({
                 className="pointer-events-none absolute inset-0 opacity-70"
                 style={{
                   backgroundImage: "radial-gradient(circle, var(--accent) 1px, transparent 1px)",
-                  backgroundSize: `${gridSize * scale}px ${gridSize * scale}px`,
+                  backgroundSize: `${grid * scale}px ${grid * scale}px`,
                   opacity: 0.25,
                 }}
               />
@@ -326,7 +327,7 @@ function Maker({
           <ToolButton icon="layers" label="Show grid" onClick={() => setShowGrid(!showGrid)} active={showGrid} />
           <span className="ml-1 flex items-center gap-1.5">
             Spacing
-            <Slider value={gridSize} min={2} max={40} onChange={setGridSize} unit="px" label="Grid spacing" />
+            <NumberField value={gridSize} onChange={setGridSize} unit="px" label="Grid spacing" />
           </span>
           {item ? (
             <>
@@ -447,21 +448,21 @@ function Maker({
         </Field>
         {!style.autoFit ? (
           <Field label="Text size">
-            <Slider value={style.fontSize} min={6} max={120} onChange={(fontSize) => setStyle({ fontSize })} unit="px" label="Text size" />
+            <NumberField value={style.fontSize} onChange={(fontSize) => setStyle({ fontSize })} unit="px" label="Text size" />
           </Field>
         ) : null}
         <Field label="Rounded corners">
-          <Slider value={style.radius} min={0} max={60} onChange={(radius) => setStyle({ radius })} unit="px" label="Rounded corners" />
+          <NumberField value={style.radius} onChange={(radius) => setStyle({ radius })} unit="px" label="Rounded corners" />
         </Field>
         <Disclosure title="More looks">
           <Field label="Border thickness">
-            <Slider value={style.borderWidth} min={0} max={12} onChange={(borderWidth) => setStyle({ borderWidth })} unit="px" label="Border thickness" />
+            <NumberField value={style.borderWidth} onChange={(borderWidth) => setStyle({ borderWidth })} unit="px" label="Border thickness" />
           </Field>
           <Field label="Border colour" stacked>
             <ColorField value={style.border} onChange={(border) => setStyle({ border })} withAlpha />
           </Field>
           <Field label="Space inside">
-            <Slider value={style.padding} min={0} max={80} onChange={(padding) => setStyle({ padding })} unit="px" label="Space inside" />
+            <NumberField value={style.padding} onChange={(padding) => setStyle({ padding })} unit="px" label="Space inside" />
           </Field>
           <Field label="Shadow" stacked>
             <Segmented
@@ -485,16 +486,8 @@ function Maker({
             const value = instance.params[p.key] ?? p.default;
             return (
               <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
-                {p.kind === "number" && p.min !== undefined && p.max !== undefined ? (
-                  <Slider value={Number(value)} min={p.min} max={p.max} onChange={(v) => setParam(p.key, v)} label={p.label} />
-                ) : p.kind === "number" ? (
-                  <input
-                    className={`${inputClass} max-w-[120px] text-right`}
-                    type="number"
-                    value={String(value)}
-                    aria-label={p.label}
-                    onChange={(e) => setParam(p.key, e.target.value === "" ? "" : Number(e.target.value))}
-                  />
+                {p.kind === "number" ? (
+                  <NumberField value={Number(value)} onChange={(v) => setParam(p.key, v)} label={p.label} />
                 ) : p.kind === "select" ? (
                   <Segmented
                     value={String(value)}
@@ -597,7 +590,7 @@ function PieceSettings({
 
       {node.kind === "text" || node.kind === "icon" ? (
         <Field label="Size">
-          <Slider value={node.scale ?? 1} min={0.4} max={6} step={0.1} onChange={(scale) => patch({ scale } as Partial<CompNode>)} unit="×" label="Size" />
+          <NumberField value={node.scale ?? 1} step={0.1} onChange={(scale) => patch({ scale } as Partial<CompNode>)} unit="×" label="Size" />
         </Field>
       ) : null}
 
