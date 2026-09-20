@@ -79,7 +79,16 @@ export type ComponentNeed = {
   label: string;
 };
 
-export type ComponentCategory = "Time" | "Weather" | "News" | "Sports" | "Numbers" | "Text & shapes";
+export type ComponentCategory =
+  | "Time"
+  | "Weather"
+  | "News"
+  | "Sports"
+  | "Markets"
+  | "Space"
+  | "Fun"
+  | "Numbers"
+  | "Text & shapes";
 
 export type ComponentDef = {
   id: string;

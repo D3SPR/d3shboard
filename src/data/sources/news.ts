@@ -28,6 +28,7 @@ export const newsSource: SourceKind = {
   label: "News headlines",
   description: "Headlines from any news site or blog that offers a feed.",
   icon: "news",
+  group: "News & web",
   refreshSec: 900,
   params: [
     {

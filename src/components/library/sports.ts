@@ -26,7 +26,106 @@ const scoreLine = (withScores: boolean) =>
     { gap: 0.4 },
   );
 
+const standings = [{ key: "standings", kind: "standings", label: "League table" }];
+
 export const SPORTS_COMPONENTS: ComponentDef[] = [
+  {
+    id: "sports.detail",
+    name: "Game in detail",
+    description: "One game with the score, quarter, clock, venue and records.",
+    icon: "trophy",
+    category: "Sports",
+    size: { w: 400, h: 260 },
+    needs,
+    root: col(
+      [
+        row([
+          when(bind("sports", "anyLive"), text("● LIVE", { size: "xs", weight: 700, color: "negative" }), { is: "yes" }),
+          spacer,
+          text(bind("sports", "broadcast"), { size: "xs", color: "muted" }),
+        ], { gap: 0.4 }),
+        row(
+          [
+            col([image(bind("sports", "awayLogo"), { size: 1.8 }), text(bind("sports", "awayShort"), { size: "xs", color: "muted" }), text(bind("sports", "awayScore"), { size: "2xl", weight: 700 })], { gap: 0.15, align: "center", grow: true }),
+            col([text(bind("sports", "periodLabel"), { size: "sm", color: "accent", weight: 700 }), text(bind("sports", "clock"), { size: "sm", color: "muted" })], { gap: 0.1, align: "center" }),
+            col([image(bind("sports", "homeLogo"), { size: 1.8 }), text(bind("sports", "homeShort"), { size: "xs", color: "muted" }), text(bind("sports", "homeScore"), { size: "2xl", weight: 700 })], { gap: 0.15, align: "center", grow: true }),
+          ],
+          { gap: 0.5, justify: "center" },
+        ),
+        text(bind("sports", "venue"), { size: "xs", color: "muted" }),
+      ],
+      { gap: 0.4, align: "center", justify: "center" },
+    ),
+  },
+  {
+    id: "standings.table",
+    name: "League table",
+    description: "Every team with wins, losses and streak.",
+    icon: "trophy",
+    category: "Sports",
+    size: { w: 400, h: 300 },
+    needs: standings,
+    params: [{ key: "count", label: "How many teams", kind: "number", min: 3, max: 12, default: 8 }],
+    root: col(
+      [
+        text(bind("standings", "league"), { size: "xs", color: "accent", caps: true, weight: 700 }),
+        repeat(
+          "standings",
+          "teams",
+          row([
+            text(item("rank"), { size: "xs", color: "muted" }),
+            image(item("logo"), { size: 1.1 }),
+            text(item("team"), { size: "sm", grow: true, lines: 1 }),
+            spacer,
+            text(item("record"), { size: "sm", weight: 600 }),
+            text(item("streak"), { size: "xs", color: "muted" }),
+          ], { gap: 0.4 }),
+          { gap: 0.5, limit: param("count"), empty: "No table right now." },
+        ),
+      ],
+      { gap: 0.45 },
+    ),
+  },
+  {
+    id: "f1.next",
+    name: "Next grand prix",
+    description: "The next Formula 1 race and the countdown to lights out.",
+    icon: "trophy",
+    category: "Sports",
+    size: { w: 360, h: 210 },
+    needs: [{ key: "f1", kind: "f1", label: "Formula 1" }],
+    root: col(
+      [
+        text("Next race", { size: "xs", color: "accent", caps: true, weight: 600 }),
+        text(bind("f1", "nextRace"), { size: "lg", weight: 700, lines: 2 }),
+        text(bind("f1", "circuit"), { size: "xs", color: "muted", lines: 1 }),
+        text(bind("f1", "startsAt"), { size: "sm", color: "accent" }),
+      ],
+      { gap: 0.2, justify: "center" },
+    ),
+  },
+  {
+    id: "f1.standings",
+    name: "F1 championship",
+    description: "The drivers' championship, points and all.",
+    icon: "trophy",
+    category: "Sports",
+    size: { w: 340, h: 280 },
+    needs: [{ key: "f1", kind: "f1", label: "Formula 1" }],
+    params: [{ key: "count", label: "How many drivers", kind: "number", min: 3, max: 10, default: 6 }],
+    root: repeat(
+      "f1",
+      "standings",
+      row([
+        text(item("position"), { size: "xs", color: "muted" }),
+        text(item("driver"), { size: "sm", weight: 600, grow: true }),
+        text(item("team"), { size: "xs", color: "muted", lines: 1 }),
+        spacer,
+        text(item("points"), { size: "sm", weight: 700 }),
+      ], { gap: 0.4 }),
+      { gap: 0.5, limit: param("count"), empty: "No standings yet." },
+    ),
+  },
   {
     id: "sports.live",
     name: "Live scores",

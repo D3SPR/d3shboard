@@ -38,10 +38,11 @@ There is no test suite or linter configured.
 ### Data sources and variables (`src/data/`)
 `doc.sources` holds configured **data sources**, shared by the whole dashboard so one fetch feeds every component using it.
 
-- A `SourceKind` (`src/data/sources/*.ts`, registered in `registry.ts`) declares its settings (`params`), refresh interval and typed `fields`, and a `load(params)` that fetches. Fields carry a `label`, a `FieldType`, default formatting and an `example` used for library previews before real data arrives — keep examples realistic, including list fields.
+- A `SourceKind` (`src/data/sources/*.ts`, registered in `registry.ts`) declares its settings (`params`), a `group` for the Add data list, a refresh interval, typed `fields` and a `load(params)` that fetches. There are ~28 kinds across weather, markets, news, sports, space, personal and fun, exposing 550+ individually bindable variables. Fields carry a `label`, a `FieldType`, default formatting and an `example` used for library previews before real data arrives — keep examples realistic, including list fields.
 - `useDataSources` (`store.ts`, provided through `DataContext` in `App.tsx`) fetches on each source's own schedule, keeps the last good values through a failed refresh, and seeds from a `localStorage` cache (`d3shboard.data.cache`) so a cold load paints real numbers. It also publishes a snapshot to `data/live.ts`, which is how the bridge and diagnostics read current values without being React components.
 - `formatValue` (`format.ts`) turns a raw value into display text; a `Binding`'s `format` overrides the field's own.
-- Everything must be key-free and CORS-friendly: there is no backend and no place to put a secret.
+- Everything must be key-free and CORS-friendly: there is no backend and no place to put a secret. **Check a new endpoint from the browser before building on it** — many well-known APIs (Yahoo Finance, Stooq, Reddit, the public CORS proxies) refuse browser requests outright. Live share prices are the one exception: `stocks` needs a free Twelve Data key for anything but AAPL, taken as a normal source setting and stored only in that browser.
+- Lists (`type: "list"`) carry `of` item fields, and every field's `example` doubles as preview data — when a library card's slot isn't filled yet, `render.tsx` falls back to the kind's examples, so previews look real before anything is set up. Keep examples realistic when adding a source.
 
 ### Components (`src/components/`)
 A component is a declarative tree (`CompNode`: `stack`, `text`, `icon`, `image`, `bar`, `divider`, `spacer`, `repeat`, `if`) rendered natively by `render.tsx` — **not** an iframe, so it inherits auto-fit, the page font, theme colours, animations and diagnostics.

@@ -1,5 +1,11 @@
 import { uid } from "../lib/board.ts";
-import type { DataSource, FieldDef, SourceKind, SourceParams } from "./types";
+import type { DataSource, FieldDef, SourceGroup, SourceKind, SourceParams } from "./types";
+import { airQualitySource, marineSource, radarSource, sunMoonSource, tidesSource, weatherAlertsSource } from "./sources/environment.ts";
+import { countdownSource, holidaysSource, onThisDaySource } from "./sources/calendar.ts";
+import { cryptoSource, currencySource, stocksSource } from "./sources/markets.ts";
+import { f1Source, funSource, standingsSource, tvSource } from "./sources/play.ts";
+import { apodSource, auroraSource, earthquakeSource, spaceSource } from "./sources/space.ts";
+import { githubSource, hackerNewsSource } from "./sources/tech.ts";
 import { jsonSource } from "./sources/json.ts";
 import { locationSource } from "./sources/location.ts";
 import { newsSource } from "./sources/news.ts";
@@ -9,13 +15,57 @@ import { weatherSource } from "./sources/weather.ts";
 
 /** Every kind of data the app can fetch. Components say which kinds they need. */
 export const SOURCE_KINDS: SourceKind[] = [
-  timeSource,
+  // Weather & sky
   weatherSource,
+  airQualitySource,
+  sunMoonSource,
+  radarSource,
+  weatherAlertsSource,
+  tidesSource,
+  marineSource,
+  // Markets
+  stocksSource,
+  cryptoSource,
+  currencySource,
+  // News & web
   newsSource,
+  hackerNewsSource,
+  githubSource,
+  // Sports
   sportsSource,
+  standingsSource,
+  f1Source,
+  // Space & planet
+  spaceSource,
+  apodSource,
+  auroraSource,
+  earthquakeSource,
+  // Time & personal
+  timeSource,
+  countdownSource,
+  holidaysSource,
+  onThisDaySource,
   locationSource,
+  // Fun
+  tvSource,
+  funSource,
+  // Advanced
   jsonSource,
 ];
+
+/** The order groups appear in the Add data list. */
+export const SOURCE_GROUPS: SourceGroup[] = [
+  "Weather & sky",
+  "Markets",
+  "News & web",
+  "Sports",
+  "Space & planet",
+  "Time & personal",
+  "Fun",
+  "Advanced",
+];
+
+export const kindsInGroup = (group: SourceGroup) => SOURCE_KINDS.filter((k) => k.group === group);
 
 export const sourceKind = (kind: string) => SOURCE_KINDS.find((k) => k.kind === kind);
 

@@ -5,6 +5,33 @@ const needsJson = [{ key: "data", kind: "json", label: "Any data link" }];
 
 export const BASIC_COMPONENTS: ComponentDef[] = [
   {
+    id: "blank.value",
+    name: "Pick your own value",
+    description: "A label and one value. Choose any variable you like in the designer.",
+    icon: "pointer",
+    category: "Text & shapes",
+    size: { w: 300, h: 160 },
+    needs: [],
+    params: [{ key: "label", label: "Label", kind: "text", default: "Pick a value" }],
+    root: col(
+      [
+        text(param("label"), { size: "xs", color: "accent", caps: true, weight: 600 }),
+        text("—", { size: "2xl", weight: 700 }),
+      ],
+      { gap: 0.25, align: "center" },
+    ),
+  },
+  {
+    id: "blank.row",
+    name: "Build your own",
+    description: "An empty card. Open the designer and add exactly the pieces and values you want.",
+    icon: "layers",
+    category: "Text & shapes",
+    size: { w: 340, h: 200 },
+    needs: [],
+    root: col([text("Open the designer to build this", { size: "sm", color: "muted" })], { gap: 0.3, justify: "center", align: "center" }),
+  },
+  {
     id: "number.big",
     name: "Big number",
     description: "One live value from a data link, with a label.",

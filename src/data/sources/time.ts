@@ -19,6 +19,7 @@ export const timeSource: SourceKind = {
   label: "Time & date",
   description: "The current time, day and date — in any time zone.",
   icon: "clock",
+  group: "Time & personal",
   refreshSec: 1,
   params: [
     {

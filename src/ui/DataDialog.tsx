@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { formatValue } from "../data/format";
-import { SOURCE_KINDS, createSource, sourceKind } from "../data/registry";
+import { SOURCE_GROUPS, createSource, kindsInGroup, sourceKind } from "../data/registry";
 import { searchPlaces } from "../data/sources/weather";
 import { fetchJson } from "../data/sources/shared";
 import type { DataStore } from "../data/store";
@@ -286,22 +286,33 @@ export function DataDialog({
       ))}
 
       {adding || sources.length === 0 ? (
-        <div className="mt-1 grid gap-2 sm:grid-cols-2">
-          {SOURCE_KINDS.map((k) => (
-            <button
-              key={k.kind}
-              onClick={() => add(k.kind)}
-              className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
-            >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-                <Icon name={k.icon} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13px] font-medium">{k.label}</span>
-                <span className="block text-[12px] leading-snug text-white/50">{k.description}</span>
-              </span>
-            </button>
-          ))}
+        <div className="mt-1">
+          {SOURCE_GROUPS.map((group) => {
+            const kinds = kindsInGroup(group);
+            if (!kinds.length) return null;
+            return (
+              <div key={group} className="mb-4">
+                <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">{group}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {kinds.map((k) => (
+                    <button
+                      key={k.kind}
+                      onClick={() => add(k.kind)}
+                      className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
+                    >
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                        <Icon name={k.icon} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium">{k.label}</span>
+                        <span className="block text-[12px] leading-snug text-white/50">{k.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <Button variant="primary" icon="plus" className="w-full" onClick={() => setAdding(true)}>

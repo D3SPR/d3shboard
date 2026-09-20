@@ -7,6 +7,7 @@ export const jsonSource: SourceKind = {
   label: "Any data link",
   description: "For tinkerers: pull a value out of any data (JSON) address.",
   icon: "gauge",
+  group: "Advanced",
   refreshSec: 300,
   params: [
     { key: "url", label: "Data address", kind: "text", placeholder: "https://…", default: "" },

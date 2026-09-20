@@ -41,11 +41,23 @@ export type ParamDef = {
 
 export type SourceParams = Record<string, string>;
 
+/** Used to group the "Add data" list once there are dozens of kinds. */
+export type SourceGroup =
+  | "Weather & sky"
+  | "Markets"
+  | "News & web"
+  | "Sports"
+  | "Space & planet"
+  | "Time & personal"
+  | "Fun"
+  | "Advanced";
+
 export type SourceKind = {
   kind: string;
   label: string;
   description: string;
   icon: IconName;
+  group: SourceGroup;
   /** Seconds between refreshes. */
   refreshSec: number;
   params: ParamDef[];

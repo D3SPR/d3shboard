@@ -82,6 +82,7 @@ export const weatherSource: SourceKind = {
   label: "Weather",
   description: "Now, by the hour and for the week ahead, anywhere in the world.",
   icon: "sun",
+  group: "Weather & sky",
   refreshSec: 900,
   params: [
     { key: "place", label: "Place", kind: "place", hint: "Search for a town or city. Everything else fills in for you.", default: "" },

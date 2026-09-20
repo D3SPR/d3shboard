@@ -6,7 +6,7 @@ import type { DataSource, FieldDef, FormatDef, SourceState } from "../data/types
 import { getPath } from "../lib/util";
 import { Icon, type IconName } from "../ui/icons";
 import { definitionFor } from "./library";
-import type { Align, ColorRole, CompNode, ComponentDef, ComponentInstance, SizeToken, Value } from "./types";
+import type { Align, ColorRole, CompNode, ComponentDef, ComponentInstance, ComponentNeed, SizeToken, Value } from "./types";
 
 const SIZES: Record<SizeToken, number> = { xs: 0.7, sm: 0.85, md: 1, lg: 1.4, xl: 2, "2xl": 3, "3xl": 4.4 };
 
@@ -33,8 +33,22 @@ type Ctx = {
   params: Record<string, string | number>;
   item: unknown;
   itemFields: FieldDef[];
+  /** The definition's data slots, so previews know what kind each one expects. */
+  needs: ComponentNeed[];
   /** In the library browser, example values stand in for data that isn't set up yet. */
   preview: boolean;
+};
+
+/**
+ * The source kind behind a slot. In a preview the slot is often empty, so it falls
+ * back to the kind the definition asks for — that's what makes library cards show
+ * real-looking values before anything is set up.
+ */
+const kindForSlot = (bind: string, ctx: Ctx) => {
+  const source = ctx.sources.find((s) => s.id === ctx.slots[bind]);
+  if (source) return sourceKind(source.kind);
+  const need = ctx.needs.find((n) => n.key === bind);
+  return ctx.preview && need ? sourceKind(need.kind) : null;
 };
 
 type Found = { raw: unknown; text: string; missing: boolean };
@@ -61,8 +75,7 @@ function resolve(value: Value | undefined, ctx: Ctx): Found {
   }
 
   const sourceId = ctx.slots[value.bind];
-  const source = ctx.sources.find((s) => s.id === sourceId);
-  const kind = source ? sourceKind(source.kind) : null;
+  const kind = kindForSlot(value.bind, ctx);
   const field = kind ? fieldAt(kind, value.path) : null;
   const raw = getPath(ctx.states[sourceId ?? ""]?.value ?? null, value.path);
   if ((raw === null || raw === undefined) && ctx.preview && field) return asFound(field.example, field, value.format);
@@ -71,8 +84,7 @@ function resolve(value: Value | undefined, ctx: Ctx): Found {
 
 function listFor(node: Extract<CompNode, { kind: "repeat" }>, ctx: Ctx) {
   const sourceId = ctx.slots[node.list.bind];
-  const source = ctx.sources.find((s) => s.id === sourceId);
-  const kind = source ? sourceKind(source.kind) : null;
+  const kind = kindForSlot(node.list.bind, ctx);
   const field = kind ? fieldAt(kind, node.list.path) : null;
   const raw = getPath(ctx.states[sourceId ?? ""]?.value ?? null, node.list.path);
   const items = Array.isArray(raw) ? raw : ctx.preview && Array.isArray(field?.example) ? (field.example as unknown[]) : [];
@@ -259,6 +271,7 @@ export function renderComponent({
     params,
     item: null,
     itemFields: [],
+    needs: def.needs,
     preview: !!preview,
   };
   return <Node node={instance.tree ?? def.root} ctx={ctx} />;

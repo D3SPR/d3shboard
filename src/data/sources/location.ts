@@ -6,6 +6,7 @@ export const locationSource: SourceKind = {
   label: "Where you are",
   description: "Your rough location, worked out from the internet connection.",
   icon: "pin",
+  group: "Time & personal",
   refreshSec: 3600,
   params: [],
   fields: [
