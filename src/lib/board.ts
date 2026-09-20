@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { BRAND } from "../brand.ts";
+import type { DataSource } from "../data/types";
 import type {
   Background,
   BoardDoc,
@@ -149,7 +150,7 @@ const starterPanel = (): Panel => ({
 
 export const starterDoc = (): BoardDoc => {
   const panel = starterPanel();
-  return { version: 4, mode: "edit", panels: [panel], activePanelId: panel.id, automations: [] };
+  return { version: 5, mode: "edit", panels: [panel], activePanelId: panel.id, automations: [], sources: [] };
 };
 
 type Loose = Record<string, any>;
@@ -176,6 +177,17 @@ const normalizePanel = (p: Loose, index: number): Panel => ({
   animations: Array.isArray(p.animations) ? p.animations : [],
 });
 
+// Saves from before data sources existed simply have none.
+const normalizeSources = (input: unknown): DataSource[] =>
+  (Array.isArray(input) ? input : [])
+    .filter((s: Loose) => s && typeof s.kind === "string")
+    .map((s: Loose) => ({
+      id: typeof s.id === "string" ? s.id : uid(),
+      kind: s.kind,
+      name: typeof s.name === "string" ? s.name : s.kind,
+      params: typeof s.params === "object" && s.params ? { ...s.params } : {},
+    }));
+
 // Accepts every saved format the app has ever written (flat v1, multi-panel v3, v4).
 export function normalizeDoc(input: unknown): BoardDoc {
   const doc = input as Loose;
@@ -184,18 +196,19 @@ export function normalizeDoc(input: unknown): BoardDoc {
   if (Array.isArray(doc.panels) && doc.panels.length > 0) {
     const panels = doc.panels.map(normalizePanel);
     return {
-      version: 4,
+      version: 5,
       mode,
       panels,
       activePanelId: panels.some((p: Panel) => p.id === doc.activePanelId)
         ? doc.activePanelId
         : panels[0].id,
       automations: Array.isArray(doc.automations) ? doc.automations : [],
+      sources: normalizeSources(doc.sources),
     };
   }
   if (Array.isArray(doc.widgets)) {
     const panel = normalizePanel(doc, 0);
-    return { version: 4, mode, panels: [panel], activePanelId: panel.id, automations: [] };
+    return { version: 5, mode, panels: [panel], activePanelId: panel.id, automations: [], sources: normalizeSources(doc.sources) };
   }
   return starterDoc();
 }

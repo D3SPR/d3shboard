@@ -1,3 +1,5 @@
+import type { DataSource } from "../data/types";
+
 export type BreakpointKey = "sm" | "md" | "lg";
 
 export type Rect = { x: number; y: number; w: number; h: number; hidden: boolean };
@@ -131,11 +133,13 @@ export type AnimationRule = {
 export type Mode = "edit" | "display";
 
 export type BoardDoc = {
-  version: 4;
+  version: 5;
   mode: Mode;
   panels: Panel[];
   activePanelId: string;
   automations: Automation[];
+  /** Data sources the whole dashboard shares, so one fetch feeds every component using it. */
+  sources: DataSource[];
 };
 
 export type RenderBoard = Panel & { mode: Mode };

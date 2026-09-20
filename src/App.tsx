@@ -20,6 +20,9 @@ import {
 } from "./lib/board";
 import type { AnimationRule, BoardDoc, BreakpointKey, Panel, Rect, RenderBoard, Widget, WidgetType } from "./lib/types";
 import { useAgentBridge } from "./bridge/useAgentBridge";
+import { DataContext, useDataSources } from "./data/store";
+import type { DataSource } from "./data/types";
+import { createSource } from "./data/registry";
 import { buildCommands, type Command } from "./commands/buildCommands";
 import { isPaletteHotkey } from "./commands/shortcut";
 import { AgentDialog } from "./ui/AgentDialog";
@@ -28,6 +31,7 @@ import { TemplatesDialog } from "./ui/TemplatesDialog";
 import { buildTemplatePanel, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
+import { DataDialog } from "./ui/DataDialog";
 import { Icon } from "./ui/icons";
 import { Toolbar, type MenuId } from "./ui/Toolbar";
 import { Welcome } from "./ui/Welcome";
@@ -65,6 +69,7 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showData, setShowData] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -76,6 +81,12 @@ export default function App() {
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const canvasRef = useRef<HTMLDivElement>(null);
   const bridge = useAgentBridge(doc, setDoc);
+  const data = useDataSources(doc.sources);
+
+  const setSources = useCallback(
+    (sources: DataSource[]) => setDoc((d) => ({ ...d, sources })),
+    [],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -345,7 +356,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -390,6 +401,7 @@ export default function App() {
     setShowAutomations(false);
     setAnimationsOpen(null);
     setShowAgent(false);
+    setShowData(false);
     setOpenMenu(null);
   };
 
@@ -437,6 +449,12 @@ export default function App() {
           resetDoc,
           openAgent: () => setShowAgent(true),
           openTemplates: () => setShowTemplates(true),
+          openData: () => setShowData(true),
+          addSource: (kind) => {
+            const created = createSource(kind);
+            if (created) setDoc((d) => ({ ...d, sources: [...d.sources, created] }));
+            setShowData(true);
+          },
           applyTemplate,
           setAgentEnabled: (enabled) => bridge.setSettings({ enabled }),
           undoAgent: bridge.undo,
@@ -459,6 +477,7 @@ export default function App() {
   };
 
   return (
+    <DataContext.Provider value={data}>
     <main className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--chrome)] text-white">
       {editing ? (
         <Toolbar
@@ -482,6 +501,7 @@ export default function App() {
           onReset={resetDoc}
           onHelp={() => setShowWelcome(true)}
           onTemplates={() => setShowTemplates(true)}
+          onData={() => setShowData(true)}
           onAgent={() => setShowAgent(true)}
           agentStatus={bridge.status}
           onCommands={() => setPaletteOpen(true)}
@@ -592,6 +612,10 @@ export default function App() {
         />
       ) : null}
 
+      {editing && showData ? (
+        <DataDialog sources={doc.sources} setSources={setSources} store={data} onClose={() => setShowData(false)} />
+      ) : null}
+
       {editing && showTemplates ? (
         <TemplatesDialog onPick={applyTemplate} onClose={() => setShowTemplates(false)} />
       ) : null}
@@ -611,5 +635,6 @@ export default function App() {
         />
       ) : null}
     </main>
+    </DataContext.Provider>
   );
 }

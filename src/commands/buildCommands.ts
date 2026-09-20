@@ -3,11 +3,13 @@ import type { BoardDoc, BreakpointKey, Panel, Widget, WidgetType } from "../lib/
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { WIDGET_CATALOG, catalogEntry } from "../widgets/catalog";
 import type { IconName } from "../ui/icons";
+import { SOURCE_KINDS } from "../data/registry";
 import { TEMPLATES } from "../templates";
 import { BACKGROUND_PRESETS, NAMED_ACCENTS, type MenuId } from "../ui/Toolbar";
 
 export const GROUP_ORDER = [
   "Add",
+  "Data",
   "Selected component",
   "Components",
   "Pages",
@@ -69,6 +71,8 @@ export type CommandContext = {
     resetDoc: () => void;
     openAgent: () => void;
     openTemplates: () => void;
+    openData: () => void;
+    addSource: (kind: string) => void;
     applyTemplate: (templateId: string) => void;
     setAgentEnabled: (enabled: boolean) => void;
     undoAgent: () => void;
@@ -93,6 +97,27 @@ export function buildCommands(ctx: CommandContext): Command[] {
       icon: item.icon,
       keywords: `new insert create component widget ${item.type} ${item.description}`,
       run: () => a.addType(item.type),
+    });
+  }
+
+  cmds.push({
+    id: "data.open",
+    label: "Open data",
+    group: "Data",
+    icon: "data",
+    keywords: "sources variables weather news sports live values feed",
+    run: a.openData,
+  });
+  for (const kind of SOURCE_KINDS) {
+    const already = doc.sources.some((s) => s.kind === kind.kind);
+    cmds.push({
+      id: `data.add.${kind.kind}`,
+      label: `Add ${kind.label.toLowerCase()} data`,
+      group: "Data",
+      icon: kind.icon,
+      detail: already ? "Already added" : undefined,
+      keywords: `source variable live ${kind.kind} ${kind.description}`,
+      run: () => a.addSource(kind.kind),
     });
   }
 

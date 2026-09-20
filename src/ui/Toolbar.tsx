@@ -55,6 +55,7 @@ type Props = {
   onReset: () => void;
   onHelp: () => void;
   onTemplates: () => void;
+  onData: () => void;
   onAgent: () => void;
   agentStatus: BridgeStatus;
   onCommands: () => void;
@@ -140,6 +141,7 @@ export function Toolbar(props: Props) {
 
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
         <ToolButton icon="plus" label="Add" active={open === "add"} onClick={() => toggle("add")} buttonRef={anchors.add} title="Add something to this page" />
+        <ToolButton icon="data" label="Data" onClick={() => { close(); props.onData(); }} title="Weather, headlines, scores and the time" />
         <ToolButton icon="palette" label="Theme" active={open === "theme"} onClick={() => toggle("theme")} buttonRef={anchors.theme} title="Colours, font and background" />
         <ToolButton icon={bpIcon} label={bpInfo.label} active={open === "screen"} onClick={() => toggle("screen")} buttonRef={anchors.screen} title="Choose which screen size you're arranging" />
         <ToolButton icon="pages" label="Pages" active={open === "pages"} onClick={() => toggle("pages")} buttonRef={anchors.pages} title="Add or switch between pages" />
