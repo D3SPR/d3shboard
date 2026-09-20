@@ -33,6 +33,18 @@ export const repeat = (slot: string, path: string, itemNode: CompNode, o: Opts<"
 
 export const when = (value: Value, then: CompNode, o: Opts<"if"> = {}): CompNode => ({ kind: "if", value, then, ...o });
 
+export const field = (param: string, o: Opts<"field"> = {}): CompNode => ({ kind: "field", param, ...o });
+
+export const stepper = (param: string, o: Opts<"stepper"> = {}): CompNode => ({ kind: "stepper", param, ...o });
+
+export const checklist = (param: string, o: Opts<"checklist"> = {}): CompNode => ({ kind: "checklist", param, ...o });
+
+export const button = (
+  label: string,
+  action: Extract<CompNode, { kind: "button" }>["action"],
+  o: Opts<"button"> = {},
+): CompNode => ({ kind: "button", label, action, ...o });
+
 export const divider: CompNode = { kind: "divider" };
 
 export const spacer: CompNode = { kind: "spacer" };

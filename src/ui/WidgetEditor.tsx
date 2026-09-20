@@ -390,8 +390,17 @@ function ComponentFields({
         const set = (v: string | number) => setInstance({ params: { ...instance.params, [p.key]: v } });
         return (
           <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
-            {p.kind === "number" ? (
-              <Slider value={Number(value)} min={p.min ?? 1} max={p.max ?? 12} onChange={set} label={p.label} />
+            {p.kind === "number" && p.min !== undefined && p.max !== undefined ? (
+              <Slider value={Number(value)} min={p.min} max={p.max} onChange={set} label={p.label} />
+            ) : p.kind === "number" ? (
+              // No stated range, so no slider to squeeze the number into.
+              <input
+                className={`${inputClass} max-w-[120px] text-right`}
+                type="number"
+                value={String(value)}
+                aria-label={p.label}
+                onChange={(e) => set(e.target.value === "" ? "" : Number(e.target.value))}
+              />
             ) : p.kind === "select" ? (
               <Segmented
                 value={String(value)}

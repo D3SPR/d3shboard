@@ -198,7 +198,7 @@ export function WidgetBody({ widget }: { widget: Widget }) {
     case "embed":
       return <CustomEmbed w={widget} />;
     case "component":
-      return <ComponentView instance={widget.component} />;
+      return <ComponentView instance={widget.component} widgetId={widget.id} />;
     default:
       return null;
   }

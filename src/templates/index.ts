@@ -298,7 +298,11 @@ export function buildTemplate(
       const slots: Record<string, string> = {};
       for (const need of def?.needs ?? []) {
         const fromTemplate = spec.use?.[need.key] ? byKey[spec.use[need.key]] : null;
-        const source = fromTemplate ? sources.find((s) => s.id === fromTemplate) : reuseOrCreate(need.kind);
+        const source = fromTemplate
+          ? sources.find((s) => s.id === fromTemplate)
+          : need.optional
+            ? sources.find((s) => s.kind === need.kind)
+            : reuseOrCreate(need.kind);
         if (source) slots[need.key] = source.id;
       }
       const widget = createComponentWidget(

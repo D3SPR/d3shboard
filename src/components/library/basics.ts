@@ -1,4 +1,4 @@
-import { bar, bind, col, divider, param, row, spacer, text } from "../nodes.ts";
+import { bar, bind, button, checklist, col, divider, field, param, row, spacer, stepper, text, when } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needsJson = [{ key: "data", kind: "json", label: "Any data link" }];
@@ -57,35 +57,94 @@ export const BASIC_COMPONENTS: ComponentDef[] = [
   },
   {
     id: "number.goal",
-    name: "Number with a goal",
-    description: "A live value shown against a target, with a bar.",
+    name: "Goal tracker",
+    description: "A value against a target, with a bar. Tap − and + to count it yourself, or connect live data.",
     icon: "activity",
     category: "Numbers",
-    size: { w: 340, h: 180 },
-    needs: needsJson,
+    size: { w: 340, h: 190 },
+    needs: [{ key: "data", kind: "json", label: "Live value (optional)", optional: true }],
     params: [
       { key: "label", label: "Label", kind: "text", default: "Progress" },
-      { key: "goal", label: "Goal", kind: "number", default: 100 },
+      {
+        key: "mode",
+        label: "Where the number comes from",
+        kind: "select",
+        default: "manual",
+        options: [
+          { value: "manual", label: "I set it" },
+          { value: "live", label: "From data" },
+        ],
+      },
+      { key: "value", label: "Current value", kind: "number", default: 3 },
+      { key: "step", label: "Each tap adds", kind: "number", default: 1 },
+      { key: "goal", label: "Goal", kind: "number", default: 10 },
     ],
     root: col(
       [
-        row([text(param("label"), { size: "sm", color: "muted" }), spacer, text(bind("data", "number"), { size: "lg", weight: 700 })]),
-        bar(bind("data", "number"), { max: param("goal") }),
-        text(param("goal"), { size: "xs", color: "muted" }),
+        row([text(param("label"), { size: "sm", color: "muted" }), spacer, text(param("goal", ), { size: "sm", color: "muted" })]),
+        when(param("mode"), stepper("value", { stepParam: "step", min: 0, size: "xl" }), {
+          is: "manual",
+          else: text(bind("data", "number"), { size: "xl", weight: 700 }),
+        }),
+        when(param("mode"), bar(param("value"), { max: param("goal") }), {
+          is: "manual",
+          else: bar(bind("data", "number"), { max: param("goal") }),
+        }),
       ],
-      { gap: 0.4, justify: "center" },
+      { gap: 0.45, justify: "center" },
+    ),
+  },
+  {
+    id: "list.todo",
+    name: "To-do list",
+    description: "Tick things off and add new ones, right on the dashboard.",
+    icon: "check",
+    category: "Text & shapes",
+    size: { w: 320, h: 260 },
+    needs: [],
+    params: [
+      { key: "title", label: "Title", kind: "text", default: "Today" },
+      { key: "items", label: "Items", kind: "text", hint: "One per line. Put x in front of a line to start it ticked.", default: "Buy milk\nWalk the dog\nx Water the plants" },
+    ],
+    root: col(
+      [
+        text(param("title"), { size: "xs", color: "accent", caps: true, weight: 600 }),
+        checklist("items", { limit: 10 }),
+      ],
+      { gap: 0.5 },
     ),
   },
   {
     id: "text.note",
     name: "Note",
-    description: "Your own words, centred in a card.",
+    description: "Your own words — and you can retype them on the finished dashboard, no editing needed.",
     icon: "text",
     category: "Text & shapes",
     size: { w: 300, h: 160 },
     needs: [],
     params: [{ key: "text", label: "What it says", kind: "text", default: "Write something here." }],
-    root: col([text(param("text"), { size: "md" })], { justify: "center", align: "center" }),
+    root: col([field("text", { size: "md", multiline: true, grow: true, placeholder: "Write something…" })], { gap: 0, grow: true }),
+  },
+  {
+    id: "count.tally",
+    name: "Tally counter",
+    description: "A number you tap up and down. Cups of coffee, days without, anything.",
+    icon: "plus",
+    category: "Numbers",
+    size: { w: 300, h: 180 },
+    needs: [],
+    params: [
+      { key: "label", label: "Label", kind: "text", default: "Count" },
+      { key: "count", label: "Current count", kind: "number", default: 0 },
+    ],
+    root: col(
+      [
+        text(param("label"), { size: "xs", color: "accent", caps: true, weight: 600 }),
+        stepper("count", { size: "2xl", min: 0 }),
+        button("Reset", "set", { param: "count", to: "0", icon: "undo" }),
+      ],
+      { gap: 0.35, align: "center", justify: "center" },
+    ),
   },
   {
     id: "text.heading",

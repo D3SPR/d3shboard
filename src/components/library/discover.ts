@@ -1,4 +1,4 @@
-import { bar, bind, col, icon, image, item, param, repeat, row, spacer, text } from "../nodes.ts";
+import { bar, bind, button, col, icon, image, item, param, repeat, row, spacer, text } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const count = (label: string, def: number, max = 10) => ({ key: "count", label, kind: "number" as const, min: 1, max, default: def });
@@ -282,7 +282,7 @@ export const DISCOVER_COMPONENTS: ComponentDef[] = [
   {
     id: "fun.joke",
     name: "Joke",
-    description: "A setup and a punchline, refreshed through the day.",
+    description: "A setup and a punchline. Tap for another one.",
     icon: "sparkles",
     category: "Fun",
     size: { w: 340, h: 200 },
@@ -291,6 +291,7 @@ export const DISCOVER_COMPONENTS: ComponentDef[] = [
       [
         text(bind("fun", "jokeSetup"), { size: "sm", lines: 3 }),
         text(bind("fun", "jokePunchline"), { size: "md", weight: 700, color: "accent", lines: 3 }),
+        button("Another", "refresh", { icon: "refresh" }),
       ],
       { gap: 0.4, justify: "center" },
     ),
@@ -308,11 +309,14 @@ export const DISCOVER_COMPONENTS: ComponentDef[] = [
   {
     id: "fun.dog",
     name: "Random dog",
-    description: "A different dog every time it refreshes.",
+    description: "A different dog whenever you tap the button.",
     icon: "image",
     category: "Fun",
-    size: { w: 300, h: 300 },
+    size: { w: 300, h: 320 },
     needs: [{ key: "fun", kind: "fun", label: "Something light" }],
-    root: col([image(bind("fun", "picture"), { grow: true, fit: "cover", radius: 0.4 })], { gap: 0 }),
+    root: col(
+      [image(bind("fun", "picture"), { grow: true, fit: "cover", radius: 0.4 }), button("Another dog", "refresh", { icon: "refresh" })],
+      { gap: 0.4 },
+    ),
   },
 ];

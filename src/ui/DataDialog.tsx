@@ -250,14 +250,11 @@ export function DataPanel({
   setSources: (next: DataSource[]) => void;
   store: DataStore;
 }) {
-  const [adding, setAdding] = useState(sources.length === 0);
-
   const add = (kind: string) => {
     const created = createSource(kind);
     if (!created) return;
     const taken = sources.filter((s) => s.kind === kind).length;
     setSources([...sources, { ...created, name: taken ? `${created.name} ${taken + 1}` : created.name }]);
-    setAdding(false);
   };
 
   return (
@@ -277,40 +274,37 @@ export function DataPanel({
         />
       ))}
 
-      {adding || sources.length === 0 ? (
-        <div className="mt-1">
-          {SOURCE_GROUPS.map((group) => {
-            const kinds = kindsInGroup(group);
-            if (!kinds.length) return null;
-            return (
-              <div key={group} className="mb-4">
-                <p className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">{group}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {kinds.map((k) => (
-                    <button
-                      key={k.kind}
-                      onClick={() => add(k.kind)}
-                      className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
-                    >
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-                        <Icon name={k.icon} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-[13px] font-medium">{k.label}</span>
-                        <span className="block text-[12px] leading-snug text-white/50">{k.description}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
+      <div className="mt-1">
+        <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">
+          {sources.length ? "Add more" : "What you can add"}
+        </p>
+        {SOURCE_GROUPS.map((group) => {
+          const kinds = kindsInGroup(group);
+          if (!kinds.length) return null;
+          return (
+            <div key={group} className="mb-4">
+              <p className="mb-2 text-[12px] font-medium text-white/55">{group}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {kinds.map((k) => (
+                  <button
+                    key={k.kind}
+                    onClick={() => add(k.kind)}
+                    className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-left transition hover:border-[var(--accent)]/60 hover:bg-white/[0.07]"
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                      <Icon name={k.icon} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-medium">{k.label}</span>
+                      <span className="block text-[12px] leading-snug text-white/50">{k.description}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <Button variant="primary" icon="plus" className="w-full" onClick={() => setAdding(true)}>
-          Add data
-        </Button>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }

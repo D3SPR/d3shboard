@@ -129,12 +129,13 @@ const friendlyDoc = (doc: BoardDoc) => ({
 });
 
 /** Points a component's slots at existing sources of the right kind, creating any that are missing. */
-function fillSlots(sources: DataSource[], needs: { key: string; kind: string }[]) {
+function fillSlots(sources: DataSource[], needs: { key: string; kind: string; optional?: boolean }[]) {
   const next = [...sources];
   const slots: Record<string, string> = {};
   for (const need of needs) {
     let found = next.find((s) => s.kind === need.kind);
-    if (!found) {
+    // Optional slots are left empty unless a matching source already exists.
+    if (!found && !need.optional) {
       const created = createSource(need.kind);
       if (created) {
         next.push(created);

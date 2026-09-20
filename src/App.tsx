@@ -25,6 +25,7 @@ import { DataContext, useDataSources } from "./data/store";
 import type { DataSource } from "./data/types";
 import { createSource } from "./data/registry";
 import { definitionFor } from "./components/library";
+import { ComponentActionsContext, type ComponentActions } from "./components/interaction";
 import type { SavedComponent } from "./components/types";
 import { buildCommands, type Command } from "./commands/buildCommands";
 import { isPaletteHotkey } from "./commands/shortcut";
@@ -91,6 +92,29 @@ export default function App() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const bridge = useAgentBridge(doc, setDoc);
   const data = useDataSources(doc.sources);
+
+  /**
+   * What viewers change on a live dashboard — a note's text, a goal's value, a
+   * ticked box — is saved into that component's settings, on whichever page it sits.
+   */
+  const componentActions: ComponentActions = useMemo(
+    () => ({
+      setParam: (widgetId, key, value) =>
+        setDoc((d) => ({
+          ...d,
+          panels: d.panels.map((p) => ({
+            ...p,
+            widgets: p.widgets.map((w) => {
+              if (w.id !== widgetId || !w.component) return w;
+              const next = typeof value === "function" ? value(w.component.params[key]) : value;
+              return { ...w, component: { ...w.component, params: { ...w.component.params, [key]: next } } };
+            }),
+          })),
+        })),
+      refreshSource: (sourceId) => data.refresh(sourceId),
+    }),
+    [data],
+  );
 
   const setSources = useCallback(
     (sources: DataSource[]) => setDoc((d) => ({ ...d, sources })),
@@ -210,7 +234,8 @@ export default function App() {
       const slots: Record<string, string> = {};
       for (const need of def.needs) {
         let found = sources.find((s) => s.kind === need.kind);
-        if (!found) {
+        // Optional data is left unconnected: the component works without it.
+        if (!found && !need.optional) {
           const created = createSource(need.kind);
           if (created) {
             sources.push(created);
@@ -616,6 +641,7 @@ export default function App() {
 
   return (
     <DataContext.Provider value={data}>
+    <ComponentActionsContext.Provider value={componentActions}>
     <main className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--chrome)] text-white">
       {editing ? (
         <Toolbar
@@ -815,6 +841,7 @@ export default function App() {
         />
       ) : null}
     </main>
+    </ComponentActionsContext.Provider>
     </DataContext.Provider>
   );
 }

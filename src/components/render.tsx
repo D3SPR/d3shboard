@@ -5,6 +5,7 @@ import { useDataStore } from "../data/store";
 import type { DataSource, FieldDef, FormatDef, SourceState } from "../data/types";
 import { getPath } from "../lib/util";
 import { Icon, type IconName } from "../ui/icons";
+import { parseChecklist, useComponentActions, writeChecklist, type ParamValue } from "./interaction";
 import { definitionFor } from "./library";
 import type { Align, ColorRole, CompNode, ComponentDef, ComponentInstance, ComponentNeed, SizeToken, Value } from "./types";
 
@@ -37,6 +38,8 @@ type Ctx = {
   needs: ComponentNeed[];
   /** In the library browser, example values stand in for data that isn't set up yet. */
   preview: boolean;
+  /** Set on a placed component, so what the viewer changes can be saved. */
+  widgetId?: string;
 };
 
 /**
@@ -242,9 +245,216 @@ function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
       return branch ? <Node node={branch} ctx={ctx} /> : null;
     }
 
+    case "field":
+      return <FieldNode node={node} ctx={ctx} />;
+
+    case "stepper":
+      return <StepperNode node={node} ctx={ctx} />;
+
+    case "checklist":
+      return <ChecklistNode node={node} ctx={ctx} />;
+
+    case "button":
+      return <ButtonNode node={node} ctx={ctx} />;
+
     default:
       return null;
   }
+}
+
+/** Writes a setting back, but only on a placed component — previews stay read-only. */
+const useSetParam = (ctx: Ctx) => {
+  const actions = useComponentActions();
+  return (key: string, value: ParamValue | ((prev: ParamValue | undefined) => ParamValue)) => {
+    if (ctx.widgetId) actions.setParam(ctx.widgetId, key, value);
+  };
+};
+
+const flatInput: CSSProperties = {
+  width: "100%",
+  background: "transparent",
+  border: "none",
+  outline: "none",
+  color: "inherit",
+  font: "inherit",
+  padding: 0,
+  resize: "none",
+};
+
+function FieldNode({ node, ctx }: { node: Extract<CompNode, { kind: "field" }>; ctx: Ctx }) {
+  const setParam = useSetParam(ctx);
+  const value = String(ctx.params[node.param] ?? "");
+  const style: CSSProperties = {
+    ...flatInput,
+    fontSize: `${SIZES[node.size ?? "md"]}em`,
+    fontWeight: node.weight,
+    color: COLORS[node.color ?? "text"],
+    opacity: node.color === "muted" ? 0.62 : undefined,
+    lineHeight: 1.25,
+    flex: node.grow ? "1 1 auto" : undefined,
+    minHeight: node.grow ? "2.5em" : undefined,
+  };
+  const props = {
+    value,
+    placeholder: node.placeholder,
+    style,
+    onChange: (e: { target: { value: string } }) => setParam(node.param, e.target.value),
+  };
+  return node.multiline ? <textarea {...props} style={{ ...style, height: node.grow ? "100%" : undefined }} /> : <input {...props} />;
+}
+
+function StepperNode({ node, ctx }: { node: Extract<CompNode, { kind: "stepper" }>; ctx: Ctx }) {
+  const setParam = useSetParam(ctx);
+  const value = Number(ctx.params[node.param] ?? 0) || 0;
+  const step = (node.stepParam ? Number(ctx.params[node.stepParam]) : node.step) || node.step || 1;
+  // Counts from the saved value, not the rendered one, so quick taps all land.
+  const nudge = (by: number) =>
+    setParam(node.param, (prev) => {
+      const from = Number(prev ?? 0) || 0;
+      return Math.min(node.max ?? Infinity, Math.max(node.min ?? -Infinity, Math.round((from + by) * 1000) / 1000));
+    });
+  const button: CSSProperties = {
+    display: "grid",
+    placeItems: "center",
+    width: "1.6em",
+    height: "1.6em",
+    borderRadius: "999px",
+    border: "1px solid currentColor",
+    opacity: 0.45,
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    lineHeight: 1,
+    cursor: "pointer",
+    flexShrink: 0,
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5em", justifyContent: "center" }}>
+      <button type="button" aria-label="Less" style={button} onClick={() => nudge(-step)}>
+        −
+      </button>
+      <span style={{ fontSize: `${SIZES[node.size ?? "xl"]}em`, fontWeight: 700, minWidth: "2em", textAlign: "center" }}>
+        {formatValue(value, "number", { unit: node.unit })}
+      </span>
+      <button type="button" aria-label="More" style={button} onClick={() => nudge(step)}>
+        +
+      </button>
+    </div>
+  );
+}
+
+function ChecklistNode({ node, ctx }: { node: Extract<CompNode, { kind: "checklist" }>; ctx: Ctx }) {
+  const setParam = useSetParam(ctx);
+  const items = parseChecklist(ctx.params[node.param]);
+  const shown = items.slice(0, node.limit ?? 12);
+  const size = SIZES[node.size ?? "sm"];
+
+  const toggle = (index: number) =>
+    setParam(node.param, (prev) =>
+      writeChecklist(parseChecklist(prev).map((item, i) => (i === index ? { ...item, done: !item.done } : item))),
+    );
+
+  const add = (text: string) => {
+    const clean = text.trim();
+    if (clean) setParam(node.param, (prev) => writeChecklist([...parseChecklist(prev), { text: clean, done: false }]));
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.45em", fontSize: `${size}em`, minHeight: 0, overflow: "auto" }}>
+      {shown.map((item, i) => (
+        <button
+          key={`${item.text}-${i}`}
+          type="button"
+          onClick={() => toggle(i)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.55em",
+            background: "transparent",
+            border: "none",
+            color: "inherit",
+            font: "inherit",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <span
+            style={{
+              display: "grid",
+              placeItems: "center",
+              width: "1.15em",
+              height: "1.15em",
+              flexShrink: 0,
+              borderRadius: "0.3em",
+              border: "1px solid currentColor",
+              opacity: item.done ? 1 : 0.4,
+              background: item.done ? "var(--accent)" : "transparent",
+              color: item.done ? "var(--accent-ink)" : "inherit",
+              fontSize: "0.8em",
+            }}
+          >
+            {item.done ? "✓" : ""}
+          </span>
+          <span style={{ opacity: item.done ? 0.45 : 1, textDecoration: item.done ? "line-through" : "none" }}>{item.text}</span>
+        </button>
+      ))}
+      {ctx.widgetId ? (
+        <input
+          placeholder={node.placeholder ?? "Add something…"}
+          style={{ ...flatInput, opacity: 0.55, fontSize: "0.95em" }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            add(e.currentTarget.value);
+            e.currentTarget.value = "";
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ButtonNode({ node, ctx }: { node: Extract<CompNode, { kind: "button" }>; ctx: Ctx }) {
+  const setParam = useSetParam(ctx);
+  const actions = useComponentActions();
+
+  const run = () => {
+    if (node.action === "refresh") {
+      const slot = node.slot ?? Object.keys(ctx.slots)[0];
+      const id = ctx.slots[slot ?? ""];
+      if (id) actions.refreshSource(id);
+      return;
+    }
+    if (!node.param) return;
+    if (node.action === "set") setParam(node.param, node.to ?? "");
+    if (node.action === "add") setParam(node.param, (prev) => (Number(prev ?? 0) || 0) + (node.amount ?? 1));
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={run}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.4em",
+        alignSelf: "center",
+        padding: "0.35em 0.9em",
+        borderRadius: "999px",
+        border: "1px solid currentColor",
+        background: "transparent",
+        color: "inherit",
+        font: "inherit",
+        fontSize: "0.85em",
+        opacity: 0.75,
+        cursor: "pointer",
+      }}
+    >
+      {node.icon ? <Icon name={node.icon} style={{ width: "1.1em", height: "1.1em" }} /> : null}
+      {node.label}
+    </button>
+  );
 }
 
 export function renderComponent({
@@ -253,12 +463,14 @@ export function renderComponent({
   states,
   sources,
   preview,
+  widgetId,
 }: {
   def: ComponentDef;
   instance: ComponentInstance;
   states: Record<string, SourceState>;
   sources: DataSource[];
   preview?: boolean;
+  widgetId?: string;
 }) {
   const params: Record<string, string | number> = {
     ...Object.fromEntries((def.params ?? []).map((p) => [p.key, p.default])),
@@ -273,12 +485,13 @@ export function renderComponent({
     itemFields: [],
     needs: def.needs,
     preview: !!preview,
+    widgetId,
   };
   return <Node node={instance.tree ?? def.root} ctx={ctx} />;
 }
 
 /** Draws a placed component. Missing data shows as dashes rather than breaking the layout. */
-export function ComponentView({ instance }: { instance: ComponentInstance | undefined }) {
+export function ComponentView({ instance, widgetId }: { instance: ComponentInstance | undefined; widgetId?: string }) {
   const store = useDataStore();
   const def = instance ? definitionFor(instance.defId) : null;
   if (!instance || !def)
@@ -296,7 +509,7 @@ export function ComponentView({ instance }: { instance: ComponentInstance | unde
         textAlign: "start",
       }}
     >
-      {renderComponent({ def, instance, states: store.states, sources: store.sources })}
+      {renderComponent({ def, instance, states: store.states, sources: store.sources, widgetId })}
     </div>
   );
 }

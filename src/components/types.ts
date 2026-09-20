@@ -59,7 +59,45 @@ export type CompNode =
       item: CompNode;
       empty?: string;
     }
-  | { kind: "if"; value: Value; is?: string; not?: string; then: CompNode; else?: CompNode };
+  | { kind: "if"; value: Value; is?: string; not?: string; then: CompNode; else?: CompNode }
+  /** Typed into by the viewer, saved straight back into the component's settings. */
+  | {
+      kind: "field";
+      param: string;
+      placeholder?: string;
+      size?: SizeToken;
+      weight?: number;
+      color?: ColorRole;
+      multiline?: boolean;
+      grow?: boolean;
+    }
+  /** A number with − and + beside it, for setting a value by hand. */
+  | {
+      kind: "stepper";
+      param: string;
+      step?: number;
+      /** Takes the step size from one of the component's settings instead. */
+      stepParam?: string;
+      min?: number;
+      max?: number;
+      size?: SizeToken;
+      unit?: string;
+    }
+  /** A tick list the viewer can check off and add to. */
+  | { kind: "checklist"; param: string; limit?: number; placeholder?: string; size?: SizeToken }
+  /** Does something when tapped: fetch the data again, or change a setting. */
+  | {
+      kind: "button";
+      label: string;
+      icon?: IconName;
+      action: "refresh" | "set" | "add";
+      /** For "set" and "add": which setting to change, and by how much. */
+      param?: string;
+      amount?: number;
+      to?: string;
+      /** For "refresh": which data slot to reload. Defaults to the first one. */
+      slot?: string;
+    };
 
 export type ComponentParam = {
   key: string;
@@ -77,6 +115,8 @@ export type ComponentNeed = {
   key: string;
   kind: string;
   label: string;
+  /** Optional slots aren't set up automatically — the component works without them. */
+  optional?: boolean;
 };
 
 export type ComponentCategory =
