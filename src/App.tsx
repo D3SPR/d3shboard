@@ -7,6 +7,8 @@ import { PanelPager } from "./canvas/PanelPager";
 import {
   breakpointFor,
   clonePanel,
+  nearestLayout,
+  screensOf,
   createComponentWidget,
   createPanel,
   createWidget,
@@ -19,7 +21,7 @@ import {
   starterDoc,
   uid,
 } from "./lib/board";
-import type { AnimationRule, BoardDoc, BreakpointKey, Panel, Rect, RenderBoard, Widget, WidgetType } from "./lib/types";
+import type { AnimationRule, BoardDoc, BreakpointKey, Panel, Rect, RenderBoard, Screen, Widget, WidgetType } from "./lib/types";
 import { useAgentBridge } from "./bridge/useAgentBridge";
 import { DataContext, useDataSources } from "./data/store";
 import type { DataSource } from "./data/types";
@@ -70,7 +72,7 @@ export default function App() {
   const [animationsOpen, setAnimationsOpen] = useState<{ editId: string | null } | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => !readNumber(WELCOME_KEY));
   const [viewHint, setViewHint] = useState(false);
-  const [windowBp, setWindowBp] = useState<BreakpointKey>(() => breakpointFor(window.innerWidth));
+  const [windowSize, setWindowSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [bpOverride, setBpOverride] = useState<BreakpointKey | null>(null);
   const [showAgent, setShowAgent] = useState(false);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
@@ -152,7 +154,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => setWindowBp(breakpointFor(window.innerWidth));
+    const onResize = () => setWindowSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -176,6 +178,8 @@ export default function App() {
   }, [doc]);
 
   const editing = doc.mode === "edit";
+  const screens = useMemo(() => screensOf(doc), [doc.screens]);
+  const windowBp = breakpointFor(windowSize.w, screens);
   const bp = editing ? (bpOverride ?? windowBp) : windowBp;
   const fx = useAutomations(doc);
 
@@ -604,6 +608,42 @@ export default function App() {
     setShowThemes(false);
   };
 
+  /**
+   * Lays the page out for the window as it is right now. Every component keeps the
+   * position it has on the closest screen, so it's a starting point, not a blank slate.
+   */
+  const addScreen = (label?: string) => {
+    const width = Math.round(window.innerWidth);
+    const height = Math.round(canvasRef.current?.clientHeight ?? window.innerHeight);
+    setDoc((d) => {
+      const existing = screensOf(d);
+      if (existing.some((s) => Math.abs(s.width - width) < 24)) {
+        showNotice("You already have a screen that size.");
+        return d;
+      }
+      const screen: Screen = { key: uid(), label: label?.trim() || `${width} × ${height}`, width, height, custom: true };
+      const next = [...existing, screen].sort((a, b) => a.width - b.width);
+      return {
+        ...d,
+        screens: next,
+        panels: d.panels.map((p) => ({
+          ...p,
+          widgets: p.widgets.map((w) => ({ ...w, layouts: { ...w.layouts, [screen.key]: nearestLayout(w.layouts, next, screen.key) } })),
+        })),
+      };
+    });
+    setBpOverride(null);
+    showNotice("Added a screen for this window. Arrange it however you like.");
+  };
+
+  const removeScreen = (key: string) => {
+    setDoc((d) => ({ ...d, screens: screensOf(d).filter((s) => s.key !== key) }));
+    setBpOverride(null);
+  };
+
+  const renameScreen = (key: string, label: string) =>
+    setDoc((d) => ({ ...d, screens: screensOf(d).map((s) => (s.key === key ? { ...s, label } : s)) }));
+
   const resetDoc = () => {
     if (confirm("Start over? This wipes your whole dashboard and can't be undone (unless you've downloaded a backup).")) {
       setDoc(starterDoc());
@@ -649,6 +689,7 @@ export default function App() {
           setHidden: (id, hidden) => updateRect(id, { hidden }),
           patchPanel: patchActivePanel,
           setBp: setBpOverride,
+          addScreen: () => addScreen(),
           goToPanel,
           addPanel,
           duplicatePanel,
@@ -709,6 +750,10 @@ export default function App() {
           board={board}
           bp={bp}
           setBp={setBpOverride}
+          screens={screens}
+          addScreen={addScreen}
+          removeScreen={removeScreen}
+          renameScreen={renameScreen}
           setBoard={patchActivePanel}
           panels={doc.panels}
           activePanelId={doc.activePanelId}
@@ -743,6 +788,7 @@ export default function App() {
             ref={canvasRef}
             board={board}
             bp={bp}
+            screens={screens}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onEdit={openWidget}
@@ -805,6 +851,7 @@ export default function App() {
           board={board}
           bp={bp}
           widget={editingWidget}
+          screens={screens}
           onClose={() => setEditingWidgetId(null)}
           update={updateWidget}
           updateRect={updateRect}

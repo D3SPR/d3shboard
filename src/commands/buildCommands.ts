@@ -1,4 +1,4 @@
-import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
+import { FONTS, effectiveStyle, rectFor, screensOf } from "../lib/board";
 import type { BoardDoc, BreakpointKey, Panel, Widget, WidgetType } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { ADDABLE_CATALOG, catalogEntry } from "../widgets/catalog";
@@ -58,6 +58,7 @@ export type CommandContext = {
     setHidden: (id: string, hidden: boolean) => void;
     patchPanel: (patch: Partial<Panel>) => void;
     setBp: (bp: BreakpointKey | null) => void;
+    addScreen: () => void;
     goToPanel: (index: number) => void;
     addPanel: () => void;
     duplicatePanel: (id: string) => void;
@@ -95,7 +96,8 @@ const SCREEN_ICON: Record<BreakpointKey, IconName> = { sm: "phone", md: "tablet"
 export function buildCommands(ctx: CommandContext): Command[] {
   const { doc, panel, panelIndex, selected, actions: a } = ctx;
   const cmds: Command[] = [];
-  const bpLabel = BREAKPOINTS.find((b) => b.key === ctx.bp)!.label;
+  const screens = screensOf(doc);
+  const bpLabel = (screens.find((b) => b.key === ctx.bp) ?? screens[screens.length - 1]).label;
 
   for (const item of ADDABLE_CATALOG) {
     cmds.push({
@@ -412,7 +414,15 @@ export function buildCommands(ctx: CommandContext): Command[] {
     },
   );
 
-  for (const b of BREAKPOINTS) {
+  cmds.push({
+    id: "screen.add",
+    label: "Add a screen for this window size",
+    group: "Screen size",
+    icon: "plus",
+    keywords: "breakpoint custom size layout current window",
+    run: a.addScreen,
+  });
+  for (const b of screens) {
     cmds.push({
       id: `screen.${b.key}`,
       label: `Arrange for ${b.label.toLowerCase()}`,

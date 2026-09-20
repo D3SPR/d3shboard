@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { BRAND } from "../brand";
-import { BREAKPOINTS, FONTS } from "../lib/board";
-import type { Background, BreakpointKey, Panel, RenderBoard } from "../lib/types";
+import { FONTS } from "../lib/board";
+import type { Background, BreakpointKey, Panel, RenderBoard, Screen } from "../lib/types";
 import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { PALETTE_SHORTCUT } from "../commands/shortcut";
 import { Icon, Logo, type IconName } from "./icons";
@@ -37,6 +37,10 @@ type Props = {
   board: RenderBoard;
   bp: BreakpointKey;
   setBp: (bp: BreakpointKey) => void;
+  screens: Screen[];
+  addScreen: () => void;
+  removeScreen: (key: string) => void;
+  renameScreen: (key: string, label: string) => void;
   setBoard: (patch: Partial<Panel>) => void;
   panels: Panel[];
   activePanelId: string;
@@ -123,8 +127,8 @@ export function Toolbar(props: Props) {
 
   const toggle = (id: MenuId) => setOpen((cur) => (cur === id ? null : id));
   const close = () => setOpen(null);
-  const bpInfo = BREAKPOINTS.find((b) => b.key === bp)!;
-  const bpIcon: IconName = bp === "sm" ? "phone" : bp === "md" ? "tablet" : "computer";
+  const bpInfo = props.screens.find((b) => b.key === bp) ?? props.screens[props.screens.length - 1];
+  const bpIcon: IconName = bpInfo.width < 600 ? "phone" : bpInfo.width < 1100 ? "tablet" : "computer";
 
   return (
     <header
@@ -187,7 +191,7 @@ export function Toolbar(props: Props) {
         <ThemeMenu board={board} setBoard={props.setBoard} onThemes={() => { close(); props.onThemes(); }} />
       </Popover>
       <Popover anchor={anchors.screen} open={open === "screen"} width={290}>
-        <ScreenMenu bp={bp} onPick={(k) => { props.setBp(k); close(); }} />
+        <ScreenMenu {...props} onPick={(k) => { props.setBp(k); close(); }} close={close} />
       </Popover>
       <Popover anchor={anchors.pages} open={open === "pages"} width={320}>
         <PagesMenu {...props} close={close} />
@@ -313,28 +317,77 @@ function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard
   );
 }
 
-function ScreenMenu({ bp, onPick }: { bp: BreakpointKey; onPick: (k: BreakpointKey) => void }) {
-  const icons: Record<BreakpointKey, IconName> = { sm: "phone", md: "tablet", lg: "computer" };
+function ScreenMenu({
+  bp,
+  screens,
+  onPick,
+  addScreen,
+  removeScreen,
+  renameScreen,
+  close,
+}: {
+  bp: BreakpointKey;
+  screens: Screen[];
+  onPick: (k: BreakpointKey) => void;
+  addScreen: () => void;
+  removeScreen: (key: string) => void;
+  renameScreen: (key: string, label: string) => void;
+  close: () => void;
+}) {
+  const iconFor = (s: Screen): IconName => (s.width < 600 ? "phone" : s.width < 1100 ? "tablet" : "computer");
   return (
     <>
       <Intro>
-        Your dashboard can be arranged differently on a phone, tablet and computer. Pick which one you're arranging right now.
+        Your dashboard is arranged separately for each screen size here, and picks the closest one when it's shown. Pick
+        which you're arranging now.
       </Intro>
-      {BREAKPOINTS.map((b) => (
-        <button
+      {screens.map((b) => (
+        <div
           key={b.key}
-          onClick={() => onPick(b.key)}
-          className={`mb-1.5 flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition hover:bg-white/10 ${bp === b.key ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-white/10"}`}
+          className={`mb-1.5 rounded-xl border ${bp === b.key ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-white/10"}`}
         >
-          <Icon name={icons[b.key]} size={20} />
-          <span>
-            <span className="block text-[13px] font-medium">{b.label}</span>
-            <span className="block text-[12px] text-white/50">About {b.width}px wide</span>
-          </span>
-        </button>
+          <button onClick={() => onPick(b.key)} className="flex w-full items-center gap-3 p-2.5 text-left transition hover:bg-white/10">
+            <Icon name={iconFor(b)} size={20} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium">{b.label}</span>
+              <span className="block text-[12px] text-white/50">
+                {b.width} × {b.height}
+              </span>
+            </span>
+          </button>
+          {b.custom ? (
+            <div className="flex items-center gap-1 border-t border-white/10 px-2 py-1.5">
+              <input
+                className="min-w-0 flex-1 bg-transparent px-1 text-[12px] outline-none"
+                value={b.label}
+                aria-label="Screen name"
+                onChange={(e) => renameScreen(b.key, e.target.value)}
+              />
+              <Button
+                variant="danger"
+                icon="trash"
+                title="Remove this screen"
+                className="px-2 py-1"
+                onClick={() => confirm(`Remove “${b.label}”? Layouts for it are forgotten.`) && removeScreen(b.key)}
+              />
+            </div>
+          ) : null}
+        </div>
       ))}
+      <Button
+        variant="primary"
+        icon="plus"
+        className="mt-1 w-full"
+        onClick={() => {
+          addScreen();
+          close();
+        }}
+      >
+        Add this window size
+      </Button>
       <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-        Moving or resizing only affects the screen size picked here. What's inside each component and how it looks stays the same everywhere.
+        Adding one copies the closest layout you already have, then you rearrange it. Moving or resizing only affects the
+        screen picked here; content and styling stay the same everywhere.
       </p>
     </>
   );

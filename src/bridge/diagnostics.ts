@@ -3,7 +3,7 @@ import type { CompNode } from "../components/types";
 import { liveData } from "../data/live";
 import { sourceKind } from "../data/registry";
 import { getPath } from "../lib/util";
-import { BREAKPOINTS, rectFor } from "../lib/board";
+import { rectFor, screensOf } from "../lib/board";
 import type { BoardDoc, BreakpointKey, Panel, Rect, Widget } from "../lib/types";
 import { embedProblems } from "./embedLog";
 
@@ -18,9 +18,6 @@ export type Finding = {
 
 const SCREEN_NAME: Record<BreakpointKey, string> = { sm: "phone", md: "tablet", lg: "computer" };
 const NAME_SCREEN: Record<string, BreakpointKey> = { phone: "sm", tablet: "md", computer: "lg" };
-
-// Without a real window to measure, assume a typical browser height for each device.
-const ASSUMED_HEIGHT: Record<BreakpointKey, number> = { sm: 720, md: 950, lg: 780 };
 
 const parseHex = (value: string) => {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim());
@@ -167,11 +164,18 @@ function checkSources(doc: BoardDoc, findings: Finding[]) {
   }
 }
 
-function checkLayout(panel: Panel, widget: Widget, bp: BreakpointKey, canvasHeight: number, findings: Finding[]) {
+function checkLayout(
+  panel: Panel,
+  widget: Widget,
+  bp: BreakpointKey,
+  size: { width: number; height: number },
+  findings: Finding[],
+) {
   const rect = rectFor(widget, bp);
   if (rect.hidden) return;
-  const screen = SCREEN_NAME[bp];
-  const width = BREAKPOINTS.find((b) => b.key === bp)!.width;
+  const screen = SCREEN_NAME[bp] ?? bp;
+  const { width } = size;
+  const canvasHeight = size.height;
   const add = (level: Finding["level"], message: string, fix?: string) =>
     findings.push({ level, widget: widget.title, widgetId: widget.id, screen, message, fix });
 
@@ -228,13 +232,13 @@ function checkLive(widget: Widget, findings: Finding[]) {
 
 export function checkDashboard(doc: BoardDoc, params: { pageId?: string; screen?: string }) {
   const panel = doc.panels.find((p) => p.id === (params.pageId ?? doc.activePanelId)) ?? doc.panels[0];
+  const all = screensOf(doc);
   const screens: BreakpointKey[] = params.screen
-    ? [NAME_SCREEN[params.screen] ?? "lg"]
-    : (["lg", "md", "sm"] as BreakpointKey[]);
+    ? [NAME_SCREEN[params.screen] ?? params.screen]
+    : [...all].reverse().map((s) => s.key);
 
   const findings: Finding[] = [];
   const onScreen = panel.widgets.some((w) => el(w.id));
-  const liveHeight = onScreen ? (document.querySelector("[data-widget-id]")?.parentElement?.clientHeight ?? 0) : 0;
 
   for (const widget of panel.widgets) {
     checkContent(widget, findings);
@@ -242,8 +246,8 @@ export function checkDashboard(doc: BoardDoc, params: { pageId?: string; screen?
     const readability = contrastFinding(panel, widget);
     if (readability) findings.push(readability);
     for (const bp of screens) {
-      const measured = liveHeight && bp === screens[0] ? liveHeight : 0;
-      checkLayout(panel, widget, bp, measured || ASSUMED_HEIGHT[bp], findings);
+      const screen = all.find((s) => s.key === bp) ?? all[all.length - 1];
+      checkLayout(panel, widget, bp, { width: screen.width, height: screen.height }, findings);
     }
     if (onScreen) checkLive(widget, findings);
   }
@@ -257,7 +261,7 @@ export function checkDashboard(doc: BoardDoc, params: { pageId?: string; screen?
   return {
     page: panel.name,
     pageId: panel.id,
-    screensChecked: screens.map((s) => SCREEN_NAME[s]),
+    screensChecked: screens.map((s) => SCREEN_NAME[s] ?? all.find((x) => x.key === s)?.label ?? s),
     liveChecks: onScreen
       ? "yes — this page is on screen, so rendering was inspected too"
       : "no — only the saved layout was checked. Call set_view for this page first to have what actually rendered inspected.",

@@ -1,7 +1,17 @@
 import type { ComponentInstance, SavedComponent } from "../components/types";
 import type { DataSource } from "../data/types";
 
-export type BreakpointKey = "sm" | "md" | "lg";
+/** The three that ship are "sm", "md" and "lg"; people can add their own. */
+export type BreakpointKey = string;
+
+export type Screen = {
+  key: string;
+  label: string;
+  width: number;
+  height: number;
+  /** Screens people added themselves can be renamed and removed. */
+  custom?: boolean;
+};
 
 export type Rect = { x: number; y: number; w: number; h: number; hidden: boolean };
 
@@ -145,6 +155,8 @@ export type BoardDoc = {
   sources: DataSource[];
   /** Component designs the user saved for reuse. */
   library: SavedComponent[];
+  /** Screen sizes this dashboard is laid out for. */
+  screens: Screen[];
 };
 
 export type RenderBoard = Panel & { mode: Mode };

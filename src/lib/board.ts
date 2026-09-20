@@ -4,6 +4,7 @@ import type { ComponentInstance } from "../components/types";
 import type { DataSource } from "../data/types";
 import type {
   Background,
+  Screen,
   BoardDoc,
   BreakpointKey,
   Panel,
@@ -14,14 +15,59 @@ import type {
 } from "./types";
 import { WIDGET_DEFAULTS } from "../widgets/defaults.ts";
 
-export const BREAKPOINTS: { key: BreakpointKey; label: string; width: number }[] = [
-  { key: "sm", label: "Phone", width: 390 },
-  { key: "md", label: "Tablet", width: 820 },
-  { key: "lg", label: "Computer", width: 1440 },
+/** The screens every dashboard starts with. People can add their own alongside them. */
+export const BREAKPOINTS: Screen[] = [
+  { key: "sm", label: "Phone", width: 390, height: 760 },
+  { key: "md", label: "Tablet", width: 820, height: 1000 },
+  { key: "lg", label: "Computer", width: 1440, height: 820 },
 ];
 
-export const breakpointFor = (width: number): BreakpointKey =>
-  width < 768 ? "sm" : width < 1200 ? "md" : "lg";
+export const screensOf = (doc: { screens?: Screen[] }): Screen[] =>
+  doc.screens?.length ? [...doc.screens].sort((a, b) => a.width - b.width) : BREAKPOINTS;
+
+export const screenByKey = (screens: Screen[], key: BreakpointKey) =>
+  screens.find((s) => s.key === key) ?? screens[screens.length - 1] ?? BREAKPOINTS[2];
+
+/** A screen for a window: the largest one that fits, or the smallest if none do. */
+export const screenFor = (width: number, screens: Screen[]): BreakpointKey => {
+  const sorted = [...screens].sort((a, b) => a.width - b.width);
+  const fits = sorted.filter((s) => width >= s.width - 1);
+  return (fits[fits.length - 1] ?? sorted[0] ?? BREAKPOINTS[0]).key;
+};
+
+/** Copies a widget's layout from the nearest screen, for a screen it hasn't got one for. */
+export const nearestLayout = (layouts: Record<string, Rect>, screens: Screen[], key: BreakpointKey): Rect => {
+  const target = screenByKey(screens, key);
+  const having = screens.filter((s) => layouts[s.key]);
+  const closest = having.sort((a, b) => Math.abs(a.width - target.width) - Math.abs(b.width - target.width))[0];
+  const base = closest ? layouts[closest.key] : Object.values(layouts)[0];
+  if (!base) return { x: 40, y: 40, w: 300, h: 180, hidden: false };
+  const from = closest ? screenByKey(screens, closest.key) : target;
+  // Bring it into the new screen's width rather than leaving it off the edge.
+  const w = Math.min(base.w, target.width - 32);
+  const x = Math.max(16, Math.min(base.x, Math.max(16, target.width - w - 16)));
+  const y = Math.min(base.y, Math.max(0, target.height - Math.min(base.h, target.height - 32)));
+  return { ...base, w, x, y: from.height === target.height ? base.y : y };
+};
+
+/**
+ * A page is laid out on a fixed stage and then scaled to whatever screen it lands on,
+ * by one factor for both directions — so a dashboard fills a phone, a laptop or a
+ * television without anything being squashed. Saved positions stay in stage units.
+ */
+export const designSize = (bp: BreakpointKey, screens: Screen[] = BREAKPOINTS) => {
+  const found = screenByKey(screens, bp);
+  return { w: found.width, h: found.height };
+};
+
+export const stageScale = (bp: BreakpointKey, view: { w: number; h: number }, screens: Screen[] = BREAKPOINTS) => {
+  const design = designSize(bp, screens);
+  if (!view.w || !view.h) return 1;
+  return Math.min(view.w / design.w, view.h / design.h);
+};
+
+export const breakpointFor = (width: number, screens: Screen[] = BREAKPOINTS): BreakpointKey =>
+  screenFor(width, screens);
 
 export const FONTS = [
   "Space Grotesk",
@@ -78,15 +124,17 @@ export const effectiveStyle = (w: Widget, rect: Rect): WidgetStyle => {
   };
 };
 
-const fitRect = (rect: Rect, bp: BreakpointKey): Rect => {
-  const width = BREAKPOINTS.find((b) => b.key === bp)!.width;
-  const w = Math.min(rect.w, width - 32);
-  return { ...rect, w, x: Math.max(16, Math.min(rect.x, Math.max(16, width - w - 16))) };
+const fitRect = (rect: Rect, screen: Screen): Rect => {
+  const w = Math.min(rect.w, screen.width - 32);
+  return { ...rect, w, x: Math.max(16, Math.min(rect.x, Math.max(16, screen.width - w - 16))) };
 };
 
-export const layoutsFrom = (x: number, y: number, w: number, h: number) => {
-  const lg: Rect = { x, y, w, h, hidden: false };
-  return { sm: fitRect(lg, "sm"), md: fitRect(lg, "md"), lg };
+export const layoutsFrom = (x: number, y: number, w: number, h: number, screens: Screen[] = BREAKPOINTS) => {
+  const widest = screens[screens.length - 1] ?? BREAKPOINTS[2];
+  const base: Rect = { x, y, w, h, hidden: false };
+  const out: Record<string, Rect> = {};
+  for (const screen of screens) out[screen.key] = screen.key === widest.key ? base : fitRect(base, screen);
+  return out;
 };
 
 export const createWidget = (type: WidgetType, x: number, y: number, z: number): Widget => {
@@ -124,7 +172,7 @@ export const createComponentWidget = (
 });
 
 export const rectFor = (w: Widget, bp: BreakpointKey): Rect =>
-  w.layouts?.[bp] ?? w.layouts?.lg ?? { x: 40, y: 40, w: 300, h: 180, hidden: false };
+  w.layouts?.[bp] ?? w.layouts?.lg ?? Object.values(w.layouts ?? {})[0] ?? { x: 40, y: 40, w: 300, h: 180, hidden: false };
 
 export const defaultBackground = (): Background => ({
   kind: "gradient",
@@ -149,7 +197,7 @@ export const createPanel = (name: string): Panel => ({
   animations: [],
 });
 
-const withLayouts = (w: Widget, extra: Partial<Record<BreakpointKey, Rect>>): Widget => ({
+const withLayouts = (w: Widget, extra: Record<BreakpointKey, Rect>): Widget => ({
   ...w,
   layouts: { ...w.layouts, ...extra },
 });
@@ -174,30 +222,44 @@ const starterPanel = (): Panel => ({
 
 export const starterDoc = (): BoardDoc => {
   const panel = starterPanel();
-  return { version: 5, mode: "edit", panels: [panel], activePanelId: panel.id, automations: [], sources: [], library: [] };
+  return {
+    version: 5,
+    mode: "edit",
+    panels: [panel],
+    activePanelId: panel.id,
+    automations: [],
+    sources: [],
+    library: [],
+    screens: BREAKPOINTS.map((s) => ({ ...s })),
+  };
 };
 
 type Loose = Record<string, any>;
 
-const normalizeWidgets = (widgets: Loose[]): Widget[] =>
-  widgets.map((w) => ({
+const normalizeWidgets = (widgets: Loose[], screens: Screen[]): Widget[] =>
+  widgets.map((w) => {
+    const layouts: Record<string, Rect> =
+      w.layouts && Object.keys(w.layouts).length
+        ? { ...w.layouts }
+        : layoutsFrom(w.x ?? 40, w.y ?? 40, w.w ?? 300, w.h ?? 180, screens);
+    // A screen added later starts from whichever existing layout is closest in width.
+    for (const screen of screens) if (!layouts[screen.key]) layouts[screen.key] = nearestLayout(layouts, screens, screen.key);
+    return {
     ...(w as Widget),
-    layouts:
-      w.layouts && w.layouts.lg
-        ? w.layouts
-        : layoutsFrom(w.x ?? 40, w.y ?? 40, w.w ?? 300, w.h ?? 180),
+    layouts,
     // Saves from before auto-fit existed keep their manual sizing so existing dashboards don't shift.
     style: { ...defaultStyle(), autoFit: false, ...(w.style ?? {}) },
     config: { ...(w.config ?? {}) },
-  }));
+    };
+  });
 
-const normalizePanel = (p: Loose, index: number): Panel => ({
+const normalizePanel = (p: Loose, index: number, screens: Screen[] = BREAKPOINTS): Panel => ({
   ...createPanel(`Page ${index + 1}`),
   ...p,
   id: p.id ?? uid(),
   name: p.name ?? `Page ${index + 1}`,
   background: { ...defaultBackground(), ...(p.background ?? {}) },
-  widgets: normalizeWidgets(Array.isArray(p.widgets) ? p.widgets : []),
+  widgets: normalizeWidgets(Array.isArray(p.widgets) ? p.widgets : [], screens),
   animations: Array.isArray(p.animations) ? p.animations : [],
 });
 
@@ -212,13 +274,30 @@ const normalizeSources = (input: unknown): DataSource[] =>
       params: typeof s.params === "object" && s.params ? { ...s.params } : {},
     }));
 
+const normalizeScreens = (input: unknown): Screen[] => {
+  const given = (Array.isArray(input) ? input : [])
+    .filter((s: Loose) => s && typeof s.key === "string" && Number(s.width) > 0)
+    .map((s: Loose) => ({
+      key: s.key,
+      label: typeof s.label === "string" ? s.label : s.key,
+      width: Math.round(Number(s.width)),
+      height: Math.round(Number(s.height) || 800),
+      custom: !!s.custom,
+    }));
+  // The three built-in screens are always present, so old saves keep working.
+  const merged = [...BREAKPOINTS.map((b) => given.find((g: Screen) => g.key === b.key) ?? { ...b })];
+  for (const screen of given) if (!merged.some((m) => m.key === screen.key)) merged.push(screen);
+  return merged.sort((a, b) => a.width - b.width);
+};
+
 // Accepts every saved format the app has ever written (flat v1, multi-panel v3, v4).
 export function normalizeDoc(input: unknown): BoardDoc {
   const doc = input as Loose;
   if (!doc || typeof doc !== "object") return starterDoc();
   const mode = doc.mode === "display" ? "display" : "edit";
+  const screens = normalizeScreens(doc.screens);
   if (Array.isArray(doc.panels) && doc.panels.length > 0) {
-    const panels = doc.panels.map(normalizePanel);
+    const panels = doc.panels.map((p: Loose, i: number) => normalizePanel(p, i, screens));
     return {
       version: 5,
       mode,
@@ -229,10 +308,11 @@ export function normalizeDoc(input: unknown): BoardDoc {
       automations: Array.isArray(doc.automations) ? doc.automations : [],
       sources: normalizeSources(doc.sources),
       library: Array.isArray(doc.library) ? doc.library : [],
+      screens,
     };
   }
   if (Array.isArray(doc.widgets)) {
-    const panel = normalizePanel(doc, 0);
+    const panel = normalizePanel(doc, 0, screens);
     return {
       version: 5,
       mode,
@@ -241,6 +321,7 @@ export function normalizeDoc(input: unknown): BoardDoc {
       automations: [],
       sources: normalizeSources(doc.sources),
       library: Array.isArray(doc.library) ? doc.library : [],
+      screens,
     };
   }
   return starterDoc();

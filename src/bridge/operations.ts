@@ -2,7 +2,6 @@ import { ALL_WIDGETS, TRIGGER_WIDGET, defaultTiming } from "../animations/engine
 import { presetByKey } from "../animations/presets";
 import { propertyByKey } from "../animations/properties";
 import {
-  BREAKPOINTS,
   createComponentWidget,
   createPanel,
   createWidget,
@@ -12,6 +11,7 @@ import {
   normalizeDoc,
   rectFor,
   removeWidgetFromPanel,
+  screensOf,
   uid,
 } from "../lib/board";
 import type {
@@ -44,6 +44,11 @@ export type OperationOutcome = { doc: BoardDoc; result: unknown; summary: string
 
 const SCREEN_TO_BP: Record<string, BreakpointKey> = { phone: "sm", tablet: "md", computer: "lg" };
 const BP_TO_SCREEN: Record<BreakpointKey, string> = { sm: "phone", md: "tablet", lg: "computer" };
+
+/** Built-in screens keep their friendly names; ones people added go by their own key. */
+const screenName = (key: BreakpointKey) => BP_TO_SCREEN[key] ?? key;
+const screenKey = (name: string, doc: BoardDoc) =>
+  SCREEN_TO_BP[name] ?? (screensOf(doc).some((s) => s.key === name) ? name : null);
 
 const fail = (message: string): never => {
   throw new BridgeError(message);
@@ -83,7 +88,7 @@ const friendlyWidget = (w: Widget) => ({
   showTitle: w.showTitle,
   locked: w.locked,
   z: w.z,
-  layouts: Object.fromEntries(BREAKPOINTS.map((b) => [BP_TO_SCREEN[b.key], rectFor(w, b.key)])),
+  layouts: Object.fromEntries(Object.keys(w.layouts ?? {}).map((key) => [screenName(key), rectFor(w, key)])),
   config: w.config,
   style: w.style,
   ...(w.component
@@ -99,9 +104,9 @@ const friendlyWidget = (w: Widget) => ({
   ...(w.style.autoFit
     ? {
         autoFitResult: Object.fromEntries(
-          BREAKPOINTS.map((b) => {
-            const s = effectiveStyle(w, rectFor(w, b.key));
-            return [BP_TO_SCREEN[b.key], { fontSize: s.fontSize, padding: s.padding, align: s.align }];
+          Object.keys(w.layouts ?? {}).map((key) => {
+            const s = effectiveStyle(w, rectFor(w, key));
+            return [screenName(key), { fontSize: s.fontSize, padding: s.padding, align: s.align }];
           }),
         ),
       }
@@ -111,7 +116,9 @@ const friendlyWidget = (w: Widget) => ({
 const friendlyDoc = (doc: BoardDoc) => ({
   mode: doc.mode === "edit" ? "editing" : "viewing",
   activePageId: doc.activePanelId,
-  screens: Object.fromEntries(BREAKPOINTS.map((b) => [BP_TO_SCREEN[b.key], { width: b.width }])),
+  screens: Object.fromEntries(
+    screensOf(doc).map((b) => [screenName(b.key), { width: b.width, height: b.height, name: b.label }]),
+  ),
   pages: doc.panels.map((p) => ({
     id: p.id,
     name: p.name,
@@ -255,7 +262,7 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
         style: { ...widget.style, ...(withOverride(params.style) ?? {}) },
       };
       for (const [screen, rect] of Object.entries((params.layouts ?? {}) as Record<string, Partial<Rect>>)) {
-        const bp = SCREEN_TO_BP[screen] ?? fail(`Unknown screen "${screen}". Use phone, tablet or computer.`);
+        const bp = screenKey(screen, doc) ?? fail(`Unknown screen "${screen}". Call get_dashboard to see them.`);
         widget.layouts[bp] = { ...widget.layouts[bp], ...rect };
       }
       return {
@@ -284,7 +291,9 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
     case "setWidgetLayout": {
       const { panel, widget } = findWidget(doc, params.widgetId);
       const screens: BreakpointKey[] =
-        params.screen === "all" ? ["sm", "md", "lg"] : [SCREEN_TO_BP[params.screen] ?? fail(`Unknown screen "${params.screen}".`)];
+        params.screen === "all"
+          ? screensOf(doc).map((s) => s.key)
+          : [screenKey(params.screen, doc) ?? fail(`Unknown screen "${params.screen}".`)];
       const patch = defined({ x: params.x, y: params.y, w: params.w, h: params.h, hidden: params.hidden }) as Partial<Rect>;
       if (patch.w !== undefined && patch.w < 80) fail("Width must be at least 80px.");
       if (patch.h !== undefined && patch.h < 60) fail("Height must be at least 60px.");
@@ -435,7 +444,7 @@ export function runOperation(doc: BoardDoc, method: Exclude<BridgeMethod, "undo"
         style: { ...widget.style, ...(withOverride(params.style) ?? {}) },
       };
       for (const [screen, rect] of Object.entries((params.layouts ?? {}) as Record<string, Partial<Rect>>)) {
-        const bp = SCREEN_TO_BP[screen] ?? fail(`Unknown screen "${screen}". Use phone, tablet or computer.`);
+        const bp = screenKey(screen, doc) ?? fail(`Unknown screen "${screen}". Call get_dashboard to see them.`);
         widget.layouts[bp] = { ...widget.layouts[bp], ...rect };
       }
       return {

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { BREAKPOINTS, FONTS, effectiveStyle, rectFor } from "../lib/board";
-import type { AnimationRule, BreakpointKey, IdleAnimation, Rect, RenderBoard, Widget, WidgetStyle } from "../lib/types";
+import { FONTS, effectiveStyle, rectFor } from "../lib/board";
+import type { AnimationRule, BreakpointKey, IdleAnimation, Rect, RenderBoard, Screen, Widget, WidgetStyle } from "../lib/types";
 import { formatDate, listLeafPaths } from "../lib/util";
 import { catalogEntry } from "../widgets/catalog";
 import { definitionFor } from "../components/library";
@@ -16,6 +16,7 @@ type Props = {
   board: RenderBoard;
   bp: BreakpointKey;
   widget: Widget;
+  screens: Screen[];
   onClose: () => void;
   update: (id: string, patch: Partial<Widget>) => void;
   updateRect: (id: string, patch: Partial<Rect>) => void;
@@ -688,9 +689,9 @@ function LookTab({ widget, accent, bp, update }: { widget: Widget; accent: strin
   );
 }
 
-function PositionTab({ widget, board, bp, update, updateRect }: Props) {
+function PositionTab({ widget, board, bp, screens, update, updateRect }: Props) {
   const rect = rectFor(widget, bp);
-  const bpLabel = BREAKPOINTS.find((b) => b.key === bp)!.label.toLowerCase();
+  const bpLabel = (screens.find((b) => b.key === bp) ?? screens[screens.length - 1]).label.toLowerCase();
   const num = (key: keyof Rect, label: string) => (
     <label className="text-[12.5px]">
       <span className="mb-1 block text-white/60">{label}</span>

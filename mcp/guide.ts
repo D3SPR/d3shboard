@@ -59,7 +59,7 @@ export function buildGuide() {
   const themeList = THEMES.map((t) => `  - \`${t.id}\` — ${t.name}: ${t.description}`).join("\n");
 
   const screenNames: Record<string, string> = { sm: "phone", md: "tablet", lg: "computer" };
-  const screens = BREAKPOINTS.map((b) => `${screenNames[b.key]} (${b.width}px wide)`).join(", ");
+  const screens = BREAKPOINTS.map((b) => `${screenNames[b.key]} (${b.width}×${b.height})`).join(", ");
   const widgets = Object.entries(WIDGET_DEFAULTS)
     // "component" is a library design, documented in its own section above.
     .filter(([type]) => type !== "component")
@@ -88,8 +88,9 @@ export function buildGuide() {
 
 ## Layout
 - Components are absolutely positioned in CSS pixels from the page's top-left: \`x\`, \`y\`, \`w\` (min 80), \`h\` (min 60). Higher \`z\` sits in front.
-- The page does **not** scroll. On a computer keep everything within roughly 1400×800; on a phone within 390×750.
-- There are three separate layouts: ${screens}. Content and style are shared; position, size and \`hidden\` are per screen.
+- The page does **not** scroll: work within the stage for that screen (computer 1440×820, tablet 820×1000, phone 390×760).
+- There are separate layouts per screen: ${screens} by default, and the user may have added their own — \`get_dashboard\` lists them under \`screens\`, and layout calls take those names. Content and style are shared; position, size and \`hidden\` are per screen.
+- A page is laid out on a fixed stage of that size and scaled as one piece to fit the real screen, so positions are in stage units, not device pixels, and nothing is ever cut off for being a few pixels too low.
 - \`add_widget\` with \`layout\` sets the computer position and squeezes phone and tablet into their width. That squeeze only shifts things left, so components that sit side by side on a computer will usually **overlap on tablet and phone**. Always lay out tablet and phone yourself with \`set_widget_layout\`. On phones, stack components in one column (x 20, w 350).
 - The editor grid is 20px by default; multiples of 20 with 40px margins look tidy.
 

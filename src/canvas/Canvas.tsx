@@ -1,6 +1,6 @@
-import { forwardRef, useRef, useState } from "react";
-import type { BreakpointKey, Rect, RenderBoard, Widget } from "../lib/types";
-import { backgroundCss, createWidget, effectiveStyle, rectFor, shadowCss } from "../lib/board";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import type { BreakpointKey, Rect, RenderBoard, Screen, Widget } from "../lib/types";
+import { backgroundCss, createWidget, designSize, effectiveStyle, rectFor, shadowCss, stageScale } from "../lib/board";
 import { WidgetBody } from "../widgets/WidgetBody";
 import { Icon } from "../ui/icons";
 
@@ -9,6 +9,7 @@ const HANDLES = ["nw", "ne", "sw", "se"] as const;
 type Props = {
   board: RenderBoard;
   bp: BreakpointKey;
+  screens: Screen[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onEdit: (id: string) => void;
@@ -17,15 +18,34 @@ type Props = {
 };
 
 export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
-  { board, bp, selectedId, onSelect, onEdit, updateRect, add },
+  { board, bp, screens, selectedId, onSelect, onEdit, updateRect, add },
   ref,
 ) {
   const localRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const [dropping, setDropping] = useState(false);
+  const [view, setView] = useState({ w: 0, h: 0 });
   const editing = board.mode === "edit";
   const lastDown = useRef({ id: "", t: 0 });
 
+  const design = designSize(bp, screens);
+  const scale = stageScale(bp, view, screens) || 1;
+
+  // The stage is a fixed size that gets scaled to fit, so watch the space it has.
+  useEffect(() => {
+    const el = localRef.current;
+    if (!el) return;
+    const measure = () => setView({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const snap = (v: number) => (board.snap ? Math.round(v / board.gridSize) * board.gridSize : Math.round(v));
+
+  /** Pointer movement is in screen pixels; the page is in stage units. */
+  const toStage = (px: number) => px / scale;
 
   // The content overlay swallows dblclick, so detect double-taps from pointerdown timing.
   const noteTap = (id: string) => {
@@ -57,8 +77,8 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
     trackPointer((ev) => {
       ev.preventDefault();
       updateRect(w.id, {
-        x: Math.max(0, snap(rect.x + ev.clientX - sx)),
-        y: Math.max(0, snap(rect.y + ev.clientY - sy)),
+        x: Math.max(0, snap(rect.x + toStage(ev.clientX - sx))),
+        y: Math.max(0, snap(rect.y + toStage(ev.clientY - sy))),
       });
     });
   };
@@ -70,8 +90,8 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
     const sy = e.clientY;
     trackPointer((ev) => {
       ev.preventDefault();
-      const dx = ev.clientX - sx;
-      const dy = ev.clientY - sy;
+      const dx = toStage(ev.clientX - sx);
+      const dy = toStage(ev.clientY - sy);
       let { x, y, w: width, h } = rect;
       if (handle.includes("e")) width = Math.max(80, rect.w + dx);
       if (handle.includes("s")) h = Math.max(60, rect.h + dy);
@@ -111,20 +131,27 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
         e.preventDefault();
         const type = e.dataTransfer.getData("widget/type") as Widget["type"];
         if (!type) return;
-        const box = localRef.current?.getBoundingClientRect();
-        const x = snap(e.clientX - (box?.left ?? 0) - 60);
-        const y = snap(e.clientY - (box?.top ?? 0) - 30);
+        const box = stageRef.current?.getBoundingClientRect();
+        const x = snap(toStage(e.clientX - (box?.left ?? 0)) - 60);
+        const y = snap(toStage(e.clientY - (box?.top ?? 0)) - 30);
         const z = Math.max(0, ...board.widgets.map((w) => w.z)) + 1;
         const widget = createWidget(type, Math.max(0, x), Math.max(0, y), z);
         add(widget);
         onSelect(widget.id);
       }}
-      className="relative h-full min-h-full w-full overflow-hidden"
+      className="relative grid h-full min-h-full w-full place-items-center overflow-hidden"
       style={{ ...backgroundCss(bg), fontFamily: `"${board.fontFamily}", system-ui, sans-serif` }}
     >
       {bg.dim > 0 ? (
         <div className="pointer-events-none absolute inset-0" style={{ background: `rgba(0,0,0,${bg.dim})` }} />
       ) : null}
+
+      {/* Everything lives on a fixed stage that is scaled as one piece to fit the screen. */}
+      <div
+        ref={stageRef}
+        className="relative"
+        style={{ width: design.w, height: design.h, transform: `scale(${scale})`, transformOrigin: "center" }}
+      >
       {editing && board.showGrid ? (
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
@@ -133,6 +160,9 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
             backgroundSize: `${board.gridSize}px ${board.gridSize}px`,
           }}
         />
+      ) : null}
+      {editing ? (
+        <div className="pointer-events-none absolute inset-0 rounded-lg border border-white/10" />
       ) : null}
       {dropping ? (
         <div
@@ -262,6 +292,7 @@ export const Canvas = forwardRef<HTMLDivElement, Props>(function Canvas(
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 });

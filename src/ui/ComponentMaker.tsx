@@ -22,8 +22,8 @@ import { Icon, type IconName } from "./icons";
 import { ACCENT_SWATCHES } from "./Toolbar";
 import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, Slider, Toggle, inputClass } from "./kit";
 
-const PREVIEW = { w: 470, h: 300 };
-const SNAP = 0.01;
+const PREVIEW = { w: 560, h: 340 };
+const HANDLES = ["nw", "ne", "sw", "se"] as const;
 
 const COLOR_CHOICES: { value: ColorRole; label: string }[] = [
   { value: "text", label: "Normal" },
@@ -76,6 +76,9 @@ function Maker({
   const store = useDataStore();
   const [selected, setSelected] = useState<string | null>(null);
   const [picking, setPicking] = useState<null | "new" | string>(null);
+  const [gridSize, setGridSize] = useState(10);
+  const [snapOn, setSnapOn] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
 
@@ -92,34 +95,56 @@ function Maker({
 
   const item = canvas?.items.find((i) => i.id === selected) ?? null;
 
-  /** Drag to move, or drag the corner to resize — both in fractions of the card. */
-  const startDrag = (event: React.PointerEvent, target: CanvasItem, mode: "move" | "resize") => {
+  // Pieces are stored as fractions of the card, but dragging and snapping work in the
+  // card's own pixels — the same feel as moving things around the page itself.
+  const inner = { w: Math.max(40, rect.w - style.padding * 2), h: Math.max(40, rect.h - style.padding * 2) };
+  const snapPx = (n: number) => (snapOn ? Math.round(n / gridSize) * gridSize : Math.round(n));
+  const toFraction = (box: { x: number; y: number; w: number; h: number }) =>
+    clampBox({ x: box.x / inner.w, y: box.y / inner.h, w: box.w / inner.w, h: box.h / inner.h });
+
+  const startDrag = (event: React.PointerEvent, target: CanvasItem, mode: "move" | (typeof HANDLES)[number]) => {
     if (!canvas) return;
     event.preventDefault();
     event.stopPropagation();
     setSelected(target.id);
-    const area = canvasRef.current?.getBoundingClientRect();
-    if (!area) return;
     const from = { x: event.clientX, y: event.clientY };
-    const origin = { ...target };
-    const snap = (n: number) => Math.round(n / SNAP) * SNAP;
+    const origin = {
+      x: target.x * inner.w,
+      y: target.y * inner.h,
+      w: target.w * inner.w,
+      h: target.h * inner.h,
+    };
 
     const onMove = (e: PointerEvent) => {
-      const dx = (e.clientX - from.x) / area.width;
-      const dy = (e.clientY - from.y) / area.height;
-      const box =
-        mode === "move"
-          ? { x: origin.x + dx, y: origin.y + dy, w: origin.w, h: origin.h }
-          : { x: origin.x, y: origin.y, w: origin.w + dx, h: origin.h + dy };
-      const fitted = clampBox(box);
-      setTree(updateItem(canvas, target.id, { x: snap(fitted.x), y: snap(fitted.y), w: snap(fitted.w), h: snap(fitted.h) }));
+      e.preventDefault();
+      const dx = (e.clientX - from.x) / scale;
+      const dy = (e.clientY - from.y) / scale;
+      let { x, y, w, h } = origin;
+      if (mode === "move") {
+        x = origin.x + dx;
+        y = origin.y + dy;
+      } else {
+        if (mode.includes("e")) w = Math.max(gridSize * 2, origin.w + dx);
+        if (mode.includes("s")) h = Math.max(gridSize * 2, origin.h + dy);
+        if (mode.includes("w")) {
+          w = Math.max(gridSize * 2, origin.w - dx);
+          x = origin.x + (origin.w - w);
+        }
+        if (mode.includes("n")) {
+          h = Math.max(gridSize * 2, origin.h - dy);
+          y = origin.y + (origin.h - h);
+        }
+      }
+      setTree(updateItem(canvas, target.id, toFraction({ x: snapPx(x), y: snapPx(y), w: snapPx(w), h: snapPx(h) })));
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   const place = (node: CompNode, box?: Partial<CanvasItem>) => {
@@ -153,7 +178,7 @@ function Maker({
       subtitle={`${def.name} — drag the pieces, then style them below.`}
       icon="layers"
       onClose={onClose}
-      width={760}
+      width={860}
       footer={
         <>
           <Button icon="move" onClick={() => onOpenSettings("position")}>
@@ -168,8 +193,33 @@ function Maker({
         </>
       }
     >
-      {/* The card at its real shape, with draggable pieces on top of it. */}
-      <div className="mb-3 grid place-items-center rounded-xl border border-white/10 bg-black/30 p-4">
+      {/* Toolbar over the canvas, the same shape as the one over the page. */}
+      <div className="mb-2 flex flex-wrap items-center gap-1">
+        <ToolButton icon="data" label="Add a value" primary onClick={() => setPicking("new")} disabled={!canvas} />
+        <ToolButton icon="text" label="Text" onClick={() => place({ kind: "text", value: "Text", scale: 1 })} disabled={!canvas} />
+        <ToolButton
+          icon="sun"
+          label="Icon"
+          onClick={() => place({ kind: "icon", value: "sun", scale: 1.6, color: "accent" }, { w: 0.22, h: 0.22 })}
+          disabled={!canvas}
+        />
+        <ToolButton
+          icon="image"
+          label="Picture"
+          onClick={() => place({ kind: "image", value: "", grow: true, fit: "cover" }, { w: 0.4, h: 0.4 })}
+          disabled={!canvas}
+        />
+        <ToolButton
+          icon="gauge"
+          label="Bar"
+          onClick={() => place({ kind: "bar", value: "50", max: "100", color: "accent" }, { h: 0.08 })}
+          disabled={!canvas}
+        />
+        <ToolButton icon="layers" label="Line" onClick={() => place({ kind: "divider" }, { h: 0.06 })} disabled={!canvas} />
+      </div>
+
+      {/* The card at its real shape, with the pieces on it. */}
+      <div className="grid place-items-center rounded-xl border border-white/10 bg-black/30 p-4">
         <div
           className="relative"
           style={{
@@ -187,6 +237,17 @@ function Maker({
           onPointerDown={() => setSelected(null)}
         >
           <div ref={canvasRef} className="relative h-full w-full">
+            {canvas && showGrid ? (
+              <div
+                className="pointer-events-none absolute inset-0 opacity-70"
+                style={{
+                  backgroundImage: "radial-gradient(circle, var(--accent) 1px, transparent 1px)",
+                  backgroundSize: `${gridSize * scale}px ${gridSize * scale}px`,
+                  opacity: 0.25,
+                }}
+              />
+            ) : null}
+
             <div className="pointer-events-none absolute inset-0">
               {renderComponent({ def, instance: { ...instance, tree }, states: store.states, sources: store.sources, preview: true })}
             </div>
@@ -198,27 +259,68 @@ function Maker({
                   key={piece.id}
                   onPointerDown={(e) => startDrag(e, piece, "move")}
                   onDoubleClick={() => setTree(raiseItem(canvas, piece.id))}
-                  className={`absolute cursor-grab rounded-[3px] ${active ? "outline-2 outline-[var(--accent)]" : "outline-1 outline-white/20 hover:outline-white/50"}`}
+                  className={`absolute rounded-[3px] ${active ? "cursor-grab outline-2 outline-[var(--accent)]" : "cursor-grab outline-1 outline-white/20 hover:outline-white/50"}`}
                   style={{
                     left: `${piece.x * 100}%`,
                     top: `${piece.y * 100}%`,
                     width: `${piece.w * 100}%`,
                     height: `${piece.h * 100}%`,
                     outlineStyle: active ? "solid" : "dashed",
+                    touchAction: "none",
                   }}
                 >
-                  {active ? (
-                    <span
-                      onPointerDown={(e) => startDrag(e, piece, "resize")}
-                      className="absolute -right-1 -bottom-1 h-3 w-3 cursor-nwse-resize rounded-full bg-[var(--accent)]"
-                    />
-                  ) : null}
+                  {active
+                    ? HANDLES.map((h) => (
+                        <span
+                          key={h}
+                          onPointerDown={(e) => startDrag(e, piece, h)}
+                          title="Drag to resize"
+                          className="absolute grid h-6 w-6 place-items-center"
+                          style={{
+                            touchAction: "none",
+                            cursor: `${h}-resize`,
+                            top: h[0] === "n" ? -12 : undefined,
+                            bottom: h[0] === "s" ? -12 : undefined,
+                            left: h[1] === "w" ? -12 : undefined,
+                            right: h[1] === "e" ? -12 : undefined,
+                          }}
+                        >
+                          <span className="block h-2.5 w-2.5 rounded-full border border-black/50 bg-[var(--accent)]" />
+                        </span>
+                      ))
+                    : null}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* Tools under the canvas, like the page's own grid controls. */}
+      {canvas ? (
+        <div className="mt-2 mb-4 flex flex-wrap items-center gap-1.5 text-[12px] text-white/55">
+          <ToolButton icon="move" label="Snap to grid" onClick={() => setSnapOn(!snapOn)} active={snapOn} />
+          <ToolButton icon="layers" label="Show grid" onClick={() => setShowGrid(!showGrid)} active={showGrid} />
+          <span className="ml-1 flex items-center gap-1.5">
+            Spacing
+            <Slider value={gridSize} min={2} max={40} onChange={setGridSize} unit="px" label="Grid spacing" />
+          </span>
+          {item ? (
+            <>
+              <ToolButton icon="copy" label="Bring to front" onClick={() => setTree(raiseItem(canvas, item.id))} />
+              <ToolButton
+                icon="trash"
+                label="Remove"
+                danger
+                onClick={() => {
+                  setTree(removeItem(canvas, item.id));
+                  setSelected(null);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* A hidden copy at the real content size: measuring it turns a self-arranging design draggable. */}
       <div className="pointer-events-none fixed top-0 -left-[9999px]" aria-hidden>
@@ -235,28 +337,7 @@ function Maker({
         </div>
       </div>
 
-      {canvas ? (
-        <div className="mb-4 flex flex-wrap gap-1.5">
-          <Button variant="primary" icon="data" onClick={() => setPicking("new")}>
-            Add a value
-          </Button>
-          <Button icon="text" onClick={() => place({ kind: "text", value: "Text", scale: 1 })}>
-            Text
-          </Button>
-          <Button icon="sun" onClick={() => place({ kind: "icon", value: "sun", scale: 1.6, color: "accent" }, { w: 0.2, h: 0.2 })}>
-            Icon
-          </Button>
-          <Button icon="image" onClick={() => place({ kind: "image", value: "", grow: true, fit: "cover" }, { w: 0.4, h: 0.4 })}>
-            Picture
-          </Button>
-          <Button icon="gauge" onClick={() => place({ kind: "bar", value: "50", max: "100", color: "accent" }, { h: 0.08 })}>
-            Bar
-          </Button>
-          <Button icon="layers" onClick={() => place({ kind: "divider" }, { h: 0.06 })}>
-            Line
-          </Button>
-        </div>
-      ) : (
+      {!canvas ? (
         <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <p className="mb-2 text-[12.5px] leading-relaxed text-white/60">
             This design arranges itself to fit whatever size you give it. Take control to drag its pieces around freely —
@@ -272,7 +353,7 @@ function Maker({
             Take control of the layout
           </Button>
         </div>
-      )}
+      ) : null}
 
       {item && canvas ? (
         <Section title="This piece" hint="Only this piece changes. Leave a setting alone and it follows the whole component.">
@@ -281,10 +362,6 @@ function Maker({
             onChange={(node) => setTree(updateItemNode(canvas, item.id, node))}
             onBox={(patch) => setTree(updateItem(canvas, item.id, patch))}
             onPick={() => setPicking(item.id)}
-            onRemove={() => {
-              setTree(removeItem(canvas, item.id));
-              setSelected(null);
-            }}
           />
         </Section>
       ) : null}
@@ -391,13 +468,11 @@ function PieceSettings({
   onChange,
   onBox,
   onPick,
-  onRemove,
 }: {
   item: CanvasItem;
   onChange: (node: CompNode) => void;
   onBox: (patch: Partial<CanvasItem>) => void;
   onPick: () => void;
-  onRemove: () => void;
 }) {
   const node = item.node;
   const patch = (p: Partial<CompNode>) => onChange({ ...node, ...p } as CompNode);
@@ -500,10 +575,47 @@ function PieceSettings({
         />
       </Field>
 
-      <Button variant="danger" icon="trash" className="w-full" onClick={onRemove}>
-        Remove this piece
-      </Button>
     </>
+  );
+}
+
+/** The same shape of button as the toolbar over the page. */
+function ToolButton({
+  icon,
+  label,
+  onClick,
+  active,
+  primary,
+  danger,
+  disabled,
+}: {
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  primary?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  const look = primary
+    ? "bg-[var(--accent)] text-[var(--accent-ink)] font-medium hover:brightness-110"
+    : danger
+      ? "text-red-200 hover:bg-red-500/20"
+      : active
+        ? "bg-white/15 text-white"
+        : "text-white/70 hover:bg-white/10 hover:text-white";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-pressed={active}
+      className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] transition disabled:pointer-events-none disabled:opacity-30 ${look}`}
+    >
+      <Icon name={icon} size={15} />
+      {label}
+    </button>
   );
 }
 
