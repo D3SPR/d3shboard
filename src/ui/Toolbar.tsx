@@ -57,6 +57,7 @@ type Props = {
   onTemplates: () => void;
   onData: () => void;
   onLibrary: () => void;
+  onThemes: () => void;
   onAgent: () => void;
   agentStatus: BridgeStatus;
   onCommands: () => void;
@@ -190,7 +191,7 @@ export function Toolbar(props: Props) {
         <AddMenu onAdd={(t) => { props.addType(t); close(); }} onLibrary={() => { close(); props.onLibrary(); }} />
       </Popover>
       <Popover anchor={anchors.theme} open={open === "theme"} width={320}>
-        <ThemeMenu board={board} setBoard={props.setBoard} />
+        <ThemeMenu board={board} setBoard={props.setBoard} onThemes={() => { close(); props.onThemes(); }} />
       </Popover>
       <Popover anchor={anchors.screen} open={open === "screen"} width={290}>
         <ScreenMenu bp={bp} onPick={(k) => { props.setBp(k); close(); }} />
@@ -238,12 +239,16 @@ function AddMenu({ onAdd, onLibrary }: { onAdd: (type: WidgetType) => void; onLi
   );
 }
 
-function ThemeMenu({ board, setBoard }: { board: RenderBoard; setBoard: (patch: Partial<Panel>) => void }) {
+function ThemeMenu({ board, setBoard, onThemes }: { board: RenderBoard; setBoard: (patch: Partial<Panel>) => void; onThemes: () => void }) {
   const bg = board.background;
   const setBg = (patch: Partial<Background>) => setBoard({ background: { ...bg, ...patch } });
   return (
     <>
       <Intro>How this page looks. Changes apply to the page you're on.</Intro>
+
+      <Button variant="primary" icon="palette" className="mb-4 w-full" onClick={onThemes}>
+        Start from a theme
+      </Button>
 
       <Section title="Highlight colour" hint="Used for buttons, outlines and glowing effects.">
         <ColorField value={board.accent} onChange={(accent) => setBoard({ accent })} swatches={ACCENT_SWATCHES} />

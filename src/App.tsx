@@ -30,6 +30,8 @@ import { isPaletteHotkey } from "./commands/shortcut";
 import { AgentDialog } from "./ui/AgentDialog";
 import { AnimationsDialog, newAnimationRule } from "./ui/AnimationsDialog";
 import { TemplatesDialog } from "./ui/TemplatesDialog";
+import { ThemesDialog } from "./ui/ThemesDialog";
+import { themeById } from "./themes";
 import { buildTemplatePanel, templateById } from "./templates";
 import { AutomationsDialog, newAutomationRule } from "./ui/AutomationsDialog";
 import { CommandPalette } from "./ui/CommandPalette";
@@ -74,6 +76,7 @@ export default function App() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showData, setShowData] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showThemes, setShowThemes] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{
     panelId: string;
     widget: Widget;
@@ -397,7 +400,7 @@ export default function App() {
   };
 
   const overlayOpen =
-    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || paletteOpen || showWelcome || openMenu !== null;
+    !!editingWidgetId || showAutomations || !!animationsOpen || showAgent || showTemplates || showData || showLibrary || showThemes || paletteOpen || showWelcome || openMenu !== null;
 
   useEffect(() => {
     if (!editing || overlayOpen) return;
@@ -429,6 +432,27 @@ export default function App() {
     setShowTemplates(false);
   };
 
+  /** Applies a whole look to the current page, and optionally to the components on it. */
+  const applyTheme = (themeId: string, restyleComponents: boolean) => {
+    const theme = themeById(themeId);
+    if (!theme) return;
+    setDoc((d) => ({
+      ...d,
+      panels: d.panels.map((p) =>
+        p.id === d.activePanelId
+          ? {
+              ...p,
+              accent: theme.accent,
+              fontFamily: theme.fontFamily,
+              background: { ...theme.background },
+              widgets: restyleComponents ? p.widgets.map((w) => ({ ...w, style: { ...w.style, ...theme.card } })) : p.widgets,
+            }
+          : p,
+      ),
+    }));
+    setShowThemes(false);
+  };
+
   const resetDoc = () => {
     if (confirm("Start over? This wipes your whole dashboard and can't be undone (unless you've downloaded a backup).")) {
       setDoc(starterDoc());
@@ -444,6 +468,7 @@ export default function App() {
     setShowAgent(false);
     setShowData(false);
     setShowLibrary(false);
+    setShowThemes(false);
     setOpenMenu(null);
   };
 
@@ -493,6 +518,8 @@ export default function App() {
           openTemplates: () => setShowTemplates(true),
           openData: () => setShowData(true),
           openLibrary: () => setShowLibrary(true),
+          openThemes: () => setShowThemes(true),
+          applyTheme,
           addComponent,
           addSource: (kind) => {
             const created = createSource(kind);
@@ -547,6 +574,7 @@ export default function App() {
           onTemplates={() => setShowTemplates(true)}
           onData={() => setShowData(true)}
           onLibrary={() => setShowLibrary(true)}
+          onThemes={() => setShowThemes(true)}
           onAgent={() => setShowAgent(true)}
           agentStatus={bridge.status}
           onCommands={() => setPaletteOpen(true)}
@@ -659,6 +687,10 @@ export default function App() {
           initialEditId={animationsOpen.editId}
           onClose={() => setAnimationsOpen(null)}
         />
+      ) : null}
+
+      {editing && showThemes ? (
+        <ThemesDialog currentAccent={panel.accent} onPick={applyTheme} onClose={() => setShowThemes(false)} />
       ) : null}
 
       {editing && showLibrary ? (

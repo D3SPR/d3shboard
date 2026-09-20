@@ -4,6 +4,7 @@ import type { BridgeStatus } from "../bridge/useAgentBridge";
 import { ADDABLE_CATALOG, catalogEntry } from "../widgets/catalog";
 import type { IconName } from "../ui/icons";
 import { COMPONENTS } from "../components/library";
+import { THEMES } from "../themes";
 import { SOURCE_KINDS } from "../data/registry";
 import { TEMPLATES } from "../templates";
 import { BACKGROUND_PRESETS, NAMED_ACCENTS, type MenuId } from "../ui/Toolbar";
@@ -76,6 +77,8 @@ export type CommandContext = {
     addSource: (kind: string) => void;
     openLibrary: () => void;
     addComponent: (defId: string) => void;
+    openThemes: () => void;
+    applyTheme: (themeId: string, restyleComponents: boolean) => void;
     applyTemplate: (templateId: string) => void;
     setAgentEnabled: (enabled: boolean) => void;
     undoAgent: () => void;
@@ -315,6 +318,25 @@ export function buildCommands(ctx: CommandContext): Command[] {
     });
   });
 
+  cmds.push({
+    id: "theme.browse",
+    label: "Browse themes",
+    group: "Theme",
+    icon: "palette",
+    keywords: "look style preset ready made skin",
+    run: a.openThemes,
+  });
+  for (const theme of THEMES) {
+    cmds.push({
+      id: `theme.apply.${theme.id}`,
+      label: `Theme: ${theme.name}`,
+      group: "Theme",
+      icon: "palette",
+      detail: theme.description,
+      keywords: `look style ${theme.description}`,
+      run: () => a.applyTheme(theme.id, true),
+    });
+  }
   cmds.push({ id: "theme.open", label: "Open theme editor", group: "Theme", icon: "palette", keywords: "colours colors style look background font", run: () => a.openMenu("theme") });
   for (const accent of NAMED_ACCENTS) {
     cmds.push({

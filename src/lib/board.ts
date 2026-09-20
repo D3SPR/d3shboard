@@ -29,6 +29,7 @@ export const FONTS = [
   "JetBrains Mono",
   "Playfair Display",
   "Bebas Neue",
+  "Unbounded",
   "system-ui",
 ];
 
