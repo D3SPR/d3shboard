@@ -6,6 +6,8 @@ import type { BreakpointKey, Panel, Rect, Widget, WidgetConfig, WidgetStyle, Wid
 import type { IconName } from "../ui/icons";
 
 type Box = [x: number, y: number, w: number, h: number];
+/** "hidden" leaves a component off that screen entirely — phones can't fit everything. */
+type Slot = Box | "hidden";
 
 /** A template's own data sources, so "Sports night" can use a sports feed for its headlines. */
 type SourceSpec = { key: string; kind: string; name?: string; params?: Record<string, string> };
@@ -15,8 +17,8 @@ type Spec = {
   showTitle?: boolean;
   style?: Partial<WidgetStyle>;
   computer: Box;
-  tablet: Box;
-  phone: Box;
+  tablet: Slot;
+  phone: Slot;
 } & (
   | { component: string; settings?: Record<string, string | number>; use?: Record<string, string>; type?: never; config?: never }
   | { type: WidgetType; config?: WidgetConfig; component?: never }
@@ -107,9 +109,9 @@ export const TEMPLATES: Template[] = [
     theme: DUSK,
     popIn: true,
     widgets: [
-      { component: "time.greeting", title: "Good morning", style: plum, computer: [40, 40, 560, 220], tablet: [20, 20, 780, 160], phone: [20, 14, 350, 120] },
-      { component: "weather.now", title: "Weather", style: plum, computer: [640, 40, 380, 220], tablet: [20, 200, 380, 190], phone: [20, 146, 350, 170] },
-      { component: "weather.details", title: "Details", style: plum, computer: [1060, 40, 340, 220], tablet: [420, 200, 380, 190], phone: [20, 328, 350, 170] },
+      { component: "time.greeting", title: "Good morning", style: plum, computer: [40, 40, 560, 220], tablet: [20, 20, 780, 160], phone: [20, 14, 350, 106] },
+      { component: "weather.now", title: "Weather", style: plum, computer: [640, 40, 380, 220], tablet: [20, 200, 380, 190], phone: [20, 132, 350, 148] },
+      { component: "weather.details", title: "Details", style: plum, computer: [1060, 40, 340, 220], tablet: [420, 200, 380, 190], phone: "hidden" },
       {
         type: "text",
         title: "Today",
@@ -118,7 +120,7 @@ export const TEMPLATES: Template[] = [
         style: { ...plum, autoFit: false, align: "left", fontSize: 15, padding: 16 },
         computer: [40, 300, 420, 360],
         tablet: [20, 410, 380, 250],
-        phone: [20, 510, 350, 150],
+        phone: [20, 292, 350, 150],
       },
       {
         component: "news.times",
@@ -128,7 +130,7 @@ export const TEMPLATES: Template[] = [
         style: plum,
         computer: [500, 300, 900, 360],
         tablet: [420, 410, 380, 250],
-        phone: [20, 672, 350, 150],
+        phone: [20, 454, 350, 252],
       },
     ],
   },
@@ -149,10 +151,10 @@ export const TEMPLATES: Template[] = [
         style: card,
         computer: [40, 40, 700, 400],
         tablet: [20, 20, 780, 280],
-        phone: [20, 14, 350, 260],
+        phone: [20, 14, 350, 240],
       },
-      { component: "sports.next", title: "Next game", style: card, computer: [40, 460, 700, 200], tablet: [20, 320, 380, 170], phone: [20, 288, 350, 150] },
-      { component: "time.simple", title: "Clock", style: card, computer: [780, 40, 620, 180], tablet: [420, 320, 380, 170], phone: [20, 452, 350, 110] },
+      { component: "sports.next", title: "Next game", style: card, computer: [40, 460, 700, 200], tablet: [20, 320, 380, 170], phone: [20, 266, 350, 140] },
+      { component: "time.simple", title: "Clock", style: card, computer: [780, 40, 620, 180], tablet: [420, 320, 380, 170], phone: [20, 418, 350, 100] },
       {
         component: "news.list",
         title: "Sports news",
@@ -161,8 +163,8 @@ export const TEMPLATES: Template[] = [
         settings: { count: 7 },
         style: card,
         computer: [780, 240, 620, 420],
-        tablet: [20, 510, 780, 170],
-        phone: [20, 576, 350, 180],
+        tablet: [20, 510, 780, 300],
+        phone: [20, 530, 350, 176],
       },
     ],
   },
@@ -230,7 +232,7 @@ export const TEMPLATES: Template[] = [
         style: violet,
         computer: [960, 200, 440, 460],
         tablet: [20, 430, 780, 240],
-        phone: [20, 532, 350, 190],
+        phone: [20, 532, 350, 168],
       },
     ],
   },
@@ -250,7 +252,10 @@ export const templateById = (id: string) => TEMPLATES.find((t) => t.id === id);
 export const templateContents = (t: Template) =>
   t.widgets.map((spec) => (spec.component ? definitionFor(spec.component)?.name ?? spec.title : spec.title));
 
-const box = (b: Box): Rect => ({ x: b[0], y: b[1], w: b[2], h: b[3], hidden: false });
+const box = (slot: Slot, fallback: Box): Rect => {
+  const b = slot === "hidden" ? fallback : slot;
+  return { x: b[0], y: b[1], w: b[2], h: b[3], hidden: slot === "hidden" };
+};
 
 /**
  * Builds the page and whatever data sources it needs. Sources the dashboard already
@@ -282,7 +287,11 @@ export function buildTemplate(
   }
 
   panel.widgets = template.widgets.map((spec, i) => {
-    const layouts: Record<BreakpointKey, Rect> = { lg: box(spec.computer), md: box(spec.tablet), sm: box(spec.phone) };
+    const layouts: Record<BreakpointKey, Rect> = {
+      lg: box(spec.computer, spec.computer),
+      md: box(spec.tablet, spec.computer),
+      sm: box(spec.phone, spec.computer),
+    };
 
     if (spec.component) {
       const def = definitionFor(spec.component);
