@@ -1,12 +1,13 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { MISSING, formatValue, mergeFormat } from "../data/format";
 import { fieldAt, sourceKind } from "../data/registry";
 import { useDataStore } from "../data/store";
 import type { DataSource, FieldDef, FormatDef, SourceState } from "../data/types";
-import { getPath } from "../lib/util";
+import { formatDate, getPath, useTick } from "../lib/util";
 import { Icon, type IconName } from "../ui/icons";
 import { parseChecklist, useComponentActions, writeChecklist, type ParamValue } from "./interaction";
 import { definitionFor } from "./library";
+import { chime } from "./sound";
 import type { Align, ColorRole, CompNode, ComponentDef, ComponentInstance, ComponentNeed, SizeToken, Value } from "./types";
 
 const SIZES: Record<SizeToken, number> = { xs: 0.7, sm: 0.85, md: 1, lg: 1.4, xl: 2, "2xl": 3, "3xl": 4.4 };
@@ -287,6 +288,9 @@ function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
     case "button":
       return <ButtonNode node={node} ctx={ctx} />;
 
+    case "timer":
+      return <TimerNode node={node} ctx={ctx} />;
+
     default:
       return null;
   }
@@ -452,6 +456,205 @@ function ChecklistNode({ node, ctx }: { node: Extract<CompNode, { kind: "checkli
             e.currentTarget.value = "";
           }}
         />
+      ) : null}
+    </div>
+  );
+}
+
+type Patch = Record<string, ParamValue>;
+
+/** 83000 → "1:23", 3723000 → "1:02:03"; stopwatches add tenths. */
+const clockText = (ms: number, tenths = false) => {
+  const total = Math.max(0, ms);
+  const h = Math.floor(total / 3_600_000);
+  const m = Math.floor((total % 3_600_000) / 60_000);
+  const sec = Math.floor((total % 60_000) / 1000);
+  const two = (n: number) => String(n).padStart(2, "0");
+  const main = h ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`;
+  return tenths ? `${main}.${Math.floor((total % 1000) / 100)}` : main;
+};
+
+const PHASES: Record<string, { label: string; key: string }> = {
+  work: { label: "Focus", key: "work" },
+  short: { label: "Short break", key: "short" },
+  long: { label: "Long break", key: "long" },
+};
+
+function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; ctx: Ctx }) {
+  const actions = useComponentActions();
+  const live = !inert(ctx);
+  const p = ctx.params;
+  const run = Number(p.run) || 0;
+  const running = run > 0;
+  useTick(running ? 100 : 1000);
+
+  const now = Date.now();
+  const elapsed = (Number(p.acc) || 0) + (running ? now - run : 0);
+  const mode = node.mode;
+
+  const patch = (fn: (prev: Patch) => Patch) => {
+    if (ctx.widgetId) actions.patchParams(ctx.widgetId, fn);
+  };
+
+  // How long this run lasts, for the modes that count down.
+  const phase = PHASES[String(p.phase || "work")] ?? PHASES.work;
+  const total =
+    mode === "countdown"
+      ? ((Number(p.minutes) || 0) * 60 + (Number(p.seconds) || 0)) * 1000
+      : mode === "pomodoro"
+        ? (Number(p[phase.key]) || 0) * 60_000
+        : 0;
+  const remaining = Math.max(0, total - elapsed);
+  const finished = (mode === "countdown" || mode === "pomodoro") && total > 0 && elapsed >= total;
+
+  // Reaching zero: a countdown stops and chimes; a pomodoro chimes and moves on by itself.
+  useEffect(() => {
+    if (!live || !running || !finished) return;
+    chime(mode === "pomodoro" ? 2 : 4);
+    patch((prev): Patch => {
+      if (Number(prev.run) !== run) return {}; // another tab already handled it
+      if (mode === "countdown") return { run: 0, acc: total };
+      const done = (Number(prev.done) || 0) + (phase.key === "work" ? 1 : 0);
+      const every = Math.max(1, Number(prev.every) || 4);
+      const next = phase.key !== "work" ? "work" : done % every === 0 ? "long" : "short";
+      return { phase: next, done, acc: 0, run: Date.now() };
+    });
+  });
+
+  // Alarm: rings once a day at the set time, until stopped or for a minute.
+  const at = String(p.at || "07:00");
+  const today = formatDate(new Date(now), "YYYY-MM-DD");
+  const armed = String(p.armed ?? "yes") !== "no";
+  const ringingSince = Number(p.ringing) || 0;
+  const ringing = mode === "alarm" && ringingSince > 0 && now - ringingSince < 60_000;
+
+  useEffect(() => {
+    if (!live || mode !== "alarm" || !armed) return;
+    if (formatDate(new Date(), "HH:mm") === at && p.lastRang !== today) {
+      patch((prev): Patch => (prev.lastRang === today ? {} : { lastRang: today, ringing: Date.now() }));
+    }
+  });
+
+  useEffect(() => {
+    if (!live || !ringing) return;
+    chime(4);
+    const id = setInterval(() => chime(4), 2000);
+    return () => clearInterval(id);
+  }, [live, ringing]);
+
+  const start = () =>
+    patch((prev): Patch => {
+      if (Number(prev.run)) return {};
+      // Starting a finished countdown starts it over.
+      const banked = Number(prev.acc) || 0;
+      return { run: Date.now(), acc: finished ? 0 : banked };
+    });
+  const pause = () =>
+    patch((prev): Patch => {
+      const since = Number(prev.run) || 0;
+      return since ? { run: 0, acc: (Number(prev.acc) || 0) + (Date.now() - since) } : {};
+    });
+  const reset = () => patch((): Patch => ({ run: 0, acc: 0, laps: "", ...(mode === "pomodoro" ? { phase: "work", done: 0 } : {}) }));
+  const lap = () =>
+    patch((prev): Patch => {
+      const since = Number(prev.run) || 0;
+      const at = (Number(prev.acc) || 0) + (since ? Date.now() - since : 0);
+      return { laps: [String(Math.round(at)), ...String(prev.laps || "").split(",").filter(Boolean)].slice(0, 20).join(",") };
+    });
+  const addMinute = () =>
+    patch((prev): Patch => ({ acc: Math.max(0, (Number(prev.acc) || 0) - 60_000) }));
+  const skip = () =>
+    patch((prev): Patch => {
+      const current = String(prev.phase || "work");
+      const done = (Number(prev.done) || 0) + (current === "work" ? 1 : 0);
+      const every = Math.max(1, Number(prev.every) || 4);
+      const next = current !== "work" ? "work" : done % every === 0 ? "long" : "short";
+      return { phase: next, done, acc: 0, run: Number(prev.run) ? Date.now() : 0 };
+    });
+
+  const Tap = live ? "button" : "span";
+  const control = (label: string, onClick: () => void, primary = false) => (
+    <Tap
+      key={label}
+      onClick={onClick}
+      style={{
+        padding: "0.35em 0.95em",
+        borderRadius: "999px",
+        border: primary ? "none" : "1px solid currentColor",
+        background: primary ? "var(--accent)" : "transparent",
+        color: primary ? "var(--accent-ink)" : "inherit",
+        opacity: primary ? 1 : 0.75,
+        font: "inherit",
+        fontSize: "0.8em",
+        fontWeight: primary ? 700 : 500,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </Tap>
+  );
+
+  const big = SIZES[node.size ?? "2xl"];
+  const label = String(p.label || "");
+  const laps = String(p.laps || "").split(",").filter(Boolean).map(Number);
+
+  let caption = label;
+  let display = "";
+  let buttons: ReactNode[] = [];
+
+  if (mode === "stopwatch") {
+    display = clockText(elapsed, true);
+    buttons = [running ? control("Pause", pause, true) : control(elapsed ? "Resume" : "Start", start, true), running ? control("Lap", lap) : control("Reset", reset)];
+  } else if (mode === "countdown") {
+    display = clockText(finished ? 0 : remaining);
+    caption = finished ? "Time's up" : label || "Timer";
+    buttons = [
+      running ? control("Pause", pause, true) : control(finished ? "Again" : elapsed ? "Resume" : "Start", start, true),
+      running ? control("+1 min", addMinute) : control("Reset", reset),
+    ];
+  } else if (mode === "pomodoro") {
+    display = clockText(remaining);
+    const done = Number(p.done) || 0;
+    caption = `${phase.label}${done ? ` · ${done} done` : ""}`;
+    buttons = [running ? control("Pause", pause, true) : control(elapsed ? "Resume" : "Start", start, true), control("Skip", skip), control("Reset", reset)];
+  } else {
+    display = at;
+    const [hh, mm] = at.split(":").map(Number);
+    const next = new Date(now);
+    next.setHours(hh || 0, mm || 0, 0, 0);
+    if (next.getTime() <= now) next.setDate(next.getDate() + 1);
+    const inMin = Math.round((next.getTime() - now) / 60_000);
+    caption = ringing ? `${label || "Alarm"} — ringing` : armed ? `${label || "Alarm"} · in ${inMin >= 60 ? `${Math.floor(inMin / 60)}h ${inMin % 60}m` : `${inMin}m`}` : `${label || "Alarm"} · off`;
+    buttons = ringing
+      ? [control("Stop", () => patch((): Patch => ({ ringing: 0 })), true)]
+      : [control(armed ? "Turn off" : "Turn on", () => patch((prev): Patch => ({ armed: String(prev.armed ?? "yes") === "no" ? "yes" : "no" })), !armed)];
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.45em", width: "100%" }}>
+      {caption ? (
+        <div style={{ fontSize: "0.75em", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, color: ringing || finished ? "var(--accent)" : undefined, opacity: ringing || finished ? 1 : 0.6 }}>
+          {caption}
+        </div>
+      ) : null}
+      <div style={{ fontSize: `${big}em`, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: ringing || finished ? "var(--accent)" : undefined }}>
+        {display}
+      </div>
+      {mode === "pomodoro" && total ? (
+        <div style={{ width: "70%", height: "0.3em", borderRadius: 999, background: "rgba(255,255,255,.14)" }}>
+          <div style={{ width: `${Math.min(100, (elapsed / total) * 100)}%`, height: "100%", borderRadius: 999, background: "var(--accent)" }} />
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: "0.4em", flexWrap: "wrap", justifyContent: "center" }}>{buttons}</div>
+      {mode === "stopwatch" && laps.length ? (
+        <div style={{ fontSize: "0.75em", opacity: 0.6, fontVariantNumeric: "tabular-nums", textAlign: "center" }}>
+          {laps.slice(0, 3).map((t, i) => (
+            <div key={i}>
+              Lap {laps.length - i} · {clockText(t, true)}
+            </div>
+          ))}
+        </div>
       ) : null}
     </div>
   );

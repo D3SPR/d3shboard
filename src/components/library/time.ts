@@ -1,4 +1,4 @@
-import { bind, col, param, row, spacer, text, when } from "../nodes.ts";
+import { bind, col, param, row, spacer, text, timer, when } from "../nodes.ts";
 import type { ComponentDef } from "../types";
 
 const needsTime = [{ key: "time", kind: "time", label: "Time & date" }];
@@ -94,5 +94,61 @@ export const TIME_COMPONENTS: ComponentDef[] = [
       ],
       { gap: 0.15, align: "center" },
     ),
+  },
+  {
+    id: "time.stopwatch",
+    name: "Stopwatch",
+    description: "Start, pause and lap. Keeps counting even if you close the page.",
+    icon: "timer",
+    category: "Time",
+    size: { w: 300, h: 220 },
+    needs: [],
+    params: [{ key: "label", label: "Label", kind: "text", default: "" }],
+    root: col([timer("stopwatch")], { justify: "center", align: "center" }),
+  },
+  {
+    id: "time.timer",
+    name: "Timer",
+    description: "Counts down and chimes at zero. Add a minute while it runs.",
+    icon: "timer",
+    category: "Time",
+    size: { w: 300, h: 210 },
+    needs: [],
+    params: [
+      { key: "label", label: "What it's for", kind: "text", default: "" },
+      { key: "minutes", label: "Minutes", kind: "number", default: 5 },
+      { key: "seconds", label: "Seconds", kind: "number", default: 0 },
+    ],
+    root: col([timer("countdown")], { justify: "center", align: "center" }),
+  },
+  {
+    id: "time.pomodoro",
+    name: "Focus timer",
+    description: "Pomodoro: focus, short break, repeat, with a longer break every few rounds.",
+    icon: "timer",
+    category: "Time",
+    size: { w: 320, h: 240 },
+    needs: [],
+    params: [
+      { key: "work", label: "Focus minutes", kind: "number", default: 25 },
+      { key: "short", label: "Short break minutes", kind: "number", default: 5 },
+      { key: "long", label: "Long break minutes", kind: "number", default: 15 },
+      { key: "every", label: "Long break every", kind: "number", hint: "How many focus rounds before a long break.", default: 4 },
+    ],
+    root: col([timer("pomodoro")], { justify: "center", align: "center" }),
+  },
+  {
+    id: "time.alarm",
+    name: "Alarm",
+    description: "Rings at the same time every day while the dashboard is open.",
+    icon: "clock",
+    category: "Time",
+    size: { w: 300, h: 200 },
+    needs: [],
+    params: [
+      { key: "label", label: "Label", kind: "text", default: "Wake up" },
+      { key: "at", label: "Time", kind: "text", hint: "24-hour, like 07:30 or 18:00.", default: "07:00" },
+    ],
+    root: col([timer("alarm")], { justify: "center", align: "center" }),
   },
 ];

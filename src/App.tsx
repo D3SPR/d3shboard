@@ -118,6 +118,22 @@ export default function App() {
             }),
           })),
         })),
+      patchParams: (widgetId, fn) =>
+        setDoc((d) => ({
+          ...d,
+          panels: d.panels.map((p) => ({
+            ...p,
+            widgets: p.widgets.map((w) => {
+              if (w.id !== widgetId || !w.component) return w;
+              const defaults = Object.fromEntries(
+                (definitionFor(w.component.defId)?.params ?? []).map((param) => [param.key, param.default]),
+              );
+              const patch = fn({ ...defaults, ...w.component.params });
+              if (!Object.keys(patch).length) return w;
+              return { ...w, component: { ...w.component, params: { ...w.component.params, ...patch } } };
+            }),
+          })),
+        })),
       refreshSource: (sourceId) => data.refresh(sourceId),
     }),
     [data],

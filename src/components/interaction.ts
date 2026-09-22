@@ -13,11 +13,18 @@ export type ComponentActions = {
    * counter must both count, and a computed value would use whatever was on screen.
    */
   setParam: (widgetId: string, key: string, value: ParamValue | ((prev: ParamValue | undefined) => ParamValue)) => void;
+  /**
+   * Changes several settings in one go, from the saved values (defaults filled in).
+   * Timers need this: pausing moves time from "running since" into "elapsed", and
+   * doing that as two separate updates could lose a moment or count it twice.
+   */
+  patchParams: (widgetId: string, fn: (prev: Record<string, ParamValue>) => Record<string, ParamValue>) => void;
   refreshSource: (sourceId: string) => void;
 };
 
 export const ComponentActionsContext = createContext<ComponentActions>({
   setParam: () => {},
+  patchParams: () => {},
   refreshSource: () => {},
 });
 

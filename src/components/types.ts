@@ -107,6 +107,11 @@ export type CompNode =
     }
   /** A tick list the viewer can check off and add to. */
   | { kind: "checklist"; param: string; limit?: number; placeholder?: string; size?: SizeToken }
+  /**
+   * A running clock with its own controls. State lives in the component's settings as
+   * timestamps ("run" = running since, "acc" = time banked), so it survives a reload.
+   */
+  | { kind: "timer"; mode: "stopwatch" | "countdown" | "pomodoro" | "alarm"; size?: SizeToken }
   /** Does something when tapped: fetch the data again, or change a setting. */
   | {
       kind: "button";

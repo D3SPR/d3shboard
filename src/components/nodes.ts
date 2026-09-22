@@ -45,6 +45,12 @@ export const button = (
   o: Opts<"button"> = {},
 ): CompNode => ({ kind: "button", label, action, ...o });
 
+export const timer = (mode: Extract<CompNode, { kind: "timer" }>["mode"], o: Opts<"timer"> = {}): CompNode => ({
+  kind: "timer",
+  mode,
+  ...o,
+});
+
 export const divider: CompNode = { kind: "divider" };
 
 export const spacer: CompNode = { kind: "spacer" };
