@@ -43,7 +43,9 @@ const CONFIG_DOCS: Record<string, { about: string; keys: Record<string, string> 
 
 export function buildGuide() {
   const componentList = COMPONENTS.map((c) => {
-    const settings = (c.params ?? []).map((p) => `${p.key} (${p.kind}, default ${JSON.stringify(p.default)})`).join(", ");
+    const settings = (c.params ?? [])
+      .map((p) => `${p.key} (${p.kind}, default ${JSON.stringify(p.default)}${p.kind === "steps" || p.kind === "places" || p.kind === "alarms" ? `; ${p.hint}` : ""})`)
+      .join(", ");
     const needs = c.needs.map((n) => n.kind).join(", ") || "no data";
     return `  - \`${c.id}\` — ${c.name}: ${c.description} Needs ${needs}. Default size ${c.size.w}×${c.size.h}.${settings ? ` Settings: ${settings}.` : ""}`;
   }).join("\n");

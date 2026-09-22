@@ -14,6 +14,7 @@ import type {
   WidgetType,
 } from "./types";
 import { WIDGET_DEFAULTS } from "../widgets/defaults.ts";
+import { migrateInstance } from "../components/timing.ts";
 
 /** The screens every dashboard starts with. People can add their own alongside them. */
 export const BREAKPOINTS: Screen[] = [
@@ -292,6 +293,29 @@ const normalizeScreens = (input: unknown): Screen[] => {
 
 // Accepts every saved format the app has ever written (flat v1, multi-panel v3, v4).
 export function normalizeDoc(input: unknown): BoardDoc {
+  return migrateComponents(readDoc(input));
+}
+
+/** Library components that were merged or reworked are rewritten into their current form. */
+function migrateComponents(doc: BoardDoc): BoardDoc {
+  const zone = (id: string) => {
+    const tz = doc.sources.find((s) => s.id === id)?.params?.timezone;
+    return typeof tz === "string" ? tz : undefined;
+  };
+  return {
+    ...doc,
+    panels: doc.panels.map((panel) => ({
+      ...panel,
+      widgets: panel.widgets.map((w) => (w.component ? { ...w, component: migrateInstance(w.component, zone) } : w)),
+    })),
+    library: doc.library.map((saved) => {
+      const moved = migrateInstance({ defId: saved.baseDefId, sources: {}, params: saved.params, tree: saved.tree }, zone);
+      return { ...saved, baseDefId: moved.defId, params: moved.params };
+    }),
+  };
+}
+
+function readDoc(input: unknown): BoardDoc {
   const doc = input as Loose;
   if (!doc || typeof doc !== "object") return starterDoc();
   const mode = doc.mode === "display" ? "display" : "edit";

@@ -8,6 +8,7 @@ import { Icon, type IconName } from "../ui/icons";
 import { parseChecklist, useComponentActions, writeChecklist, type ParamValue } from "./interaction";
 import { definitionFor } from "./library";
 import { chime } from "./sound";
+import { alarmDaysText, cityFromZone, nextPosition, nextRing, parseAlarms, parsePlaces, routineOf, stepAt, writeAlarms, type Alarm } from "./timing";
 import type { Align, ColorRole, CompNode, ComponentDef, ComponentInstance, ComponentNeed, SizeToken, Value } from "./types";
 
 const SIZES: Record<SizeToken, number> = { xs: 0.7, sm: 0.85, md: 1, lg: 1.4, xl: 2, "2xl": 3, "3xl": 4.4 };
@@ -289,7 +290,9 @@ function Node({ node, ctx }: { node: CompNode; ctx: Ctx }): ReactNode {
       return <ButtonNode node={node} ctx={ctx} />;
 
     case "timer":
-      return <TimerNode node={node} ctx={ctx} />;
+      return node.mode === "alarm" ? <AlarmNode node={node} ctx={ctx} /> : <TimerNode node={node} ctx={ctx} />;
+    case "clocks":
+      return <ClocksNode node={node} ctx={ctx} />;
 
     default:
       return null;
@@ -463,7 +466,7 @@ function ChecklistNode({ node, ctx }: { node: Extract<CompNode, { kind: "checkli
 
 type Patch = Record<string, ParamValue>;
 
-/** 83000 → "1:23", 3723000 → "1:02:03"; stopwatches add tenths. */
+/** 83000 → "01:23", 3723000 → "1:02:03"; stopwatches add tenths. */
 const clockText = (ms: number, tenths = false) => {
   const total = Math.max(0, ms);
   const h = Math.floor(total / 3_600_000);
@@ -474,106 +477,13 @@ const clockText = (ms: number, tenths = false) => {
   return tenths ? `${main}.${Math.floor((total % 1000) / 100)}` : main;
 };
 
-const PHASES: Record<string, { label: string; key: string }> = {
-  work: { label: "Focus", key: "work" },
-  short: { label: "Short break", key: "short" },
-  long: { label: "Long break", key: "long" },
-};
+/** A remaining time shown while counting down: rounded up, so it reads 00:01 until it really is zero. */
+const countdownText = (ms: number) => clockText(Math.ceil(Math.max(0, ms) / 1000) * 1000);
 
-function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; ctx: Ctx }) {
-  const actions = useComponentActions();
-  const live = !inert(ctx);
-  const p = ctx.params;
-  const run = Number(p.run) || 0;
-  const running = run > 0;
-  useTick(running ? 100 : 1000);
-
-  const now = Date.now();
-  const elapsed = (Number(p.acc) || 0) + (running ? now - run : 0);
-  const mode = node.mode;
-
-  const patch = (fn: (prev: Patch) => Patch) => {
-    if (ctx.widgetId) actions.patchParams(ctx.widgetId, fn);
-  };
-
-  // How long this run lasts, for the modes that count down.
-  const phase = PHASES[String(p.phase || "work")] ?? PHASES.work;
-  const total =
-    mode === "countdown"
-      ? ((Number(p.minutes) || 0) * 60 + (Number(p.seconds) || 0)) * 1000
-      : mode === "pomodoro"
-        ? (Number(p[phase.key]) || 0) * 60_000
-        : 0;
-  const remaining = Math.max(0, total - elapsed);
-  const finished = (mode === "countdown" || mode === "pomodoro") && total > 0 && elapsed >= total;
-
-  // Reaching zero: a countdown stops and chimes; a pomodoro chimes and moves on by itself.
-  useEffect(() => {
-    if (!live || !running || !finished) return;
-    chime(mode === "pomodoro" ? 2 : 4);
-    patch((prev): Patch => {
-      if (Number(prev.run) !== run) return {}; // another tab already handled it
-      if (mode === "countdown") return { run: 0, acc: total };
-      const done = (Number(prev.done) || 0) + (phase.key === "work" ? 1 : 0);
-      const every = Math.max(1, Number(prev.every) || 4);
-      const next = phase.key !== "work" ? "work" : done % every === 0 ? "long" : "short";
-      return { phase: next, done, acc: 0, run: Date.now() };
-    });
-  });
-
-  // Alarm: rings once a day at the set time, until stopped or for a minute.
-  const at = String(p.at || "07:00");
-  const today = formatDate(new Date(now), "YYYY-MM-DD");
-  const armed = String(p.armed ?? "yes") !== "no";
-  const ringingSince = Number(p.ringing) || 0;
-  const ringing = mode === "alarm" && ringingSince > 0 && now - ringingSince < 60_000;
-
-  useEffect(() => {
-    if (!live || mode !== "alarm" || !armed) return;
-    if (formatDate(new Date(), "HH:mm") === at && p.lastRang !== today) {
-      patch((prev): Patch => (prev.lastRang === today ? {} : { lastRang: today, ringing: Date.now() }));
-    }
-  });
-
-  useEffect(() => {
-    if (!live || !ringing) return;
-    chime(4);
-    const id = setInterval(() => chime(4), 2000);
-    return () => clearInterval(id);
-  }, [live, ringing]);
-
-  const start = () =>
-    patch((prev): Patch => {
-      if (Number(prev.run)) return {};
-      // Starting a finished countdown starts it over.
-      const banked = Number(prev.acc) || 0;
-      return { run: Date.now(), acc: finished ? 0 : banked };
-    });
-  const pause = () =>
-    patch((prev): Patch => {
-      const since = Number(prev.run) || 0;
-      return since ? { run: 0, acc: (Number(prev.acc) || 0) + (Date.now() - since) } : {};
-    });
-  const reset = () => patch((): Patch => ({ run: 0, acc: 0, laps: "", ...(mode === "pomodoro" ? { phase: "work", done: 0 } : {}) }));
-  const lap = () =>
-    patch((prev): Patch => {
-      const since = Number(prev.run) || 0;
-      const at = (Number(prev.acc) || 0) + (since ? Date.now() - since : 0);
-      return { laps: [String(Math.round(at)), ...String(prev.laps || "").split(",").filter(Boolean)].slice(0, 20).join(",") };
-    });
-  const addMinute = () =>
-    patch((prev): Patch => ({ acc: Math.max(0, (Number(prev.acc) || 0) - 60_000) }));
-  const skip = () =>
-    patch((prev): Patch => {
-      const current = String(prev.phase || "work");
-      const done = (Number(prev.done) || 0) + (current === "work" ? 1 : 0);
-      const every = Math.max(1, Number(prev.every) || 4);
-      const next = current !== "work" ? "work" : done % every === 0 ? "long" : "short";
-      return { phase: next, done, acc: 0, run: Number(prev.run) ? Date.now() : 0 };
-    });
-
+/** The round buttons under a timer or alarm; plain text in previews, where a button would sit inside one. */
+const pill = (live: boolean) => (label: string, onClick: () => void, primary = false) => {
   const Tap = live ? "button" : "span";
-  const control = (label: string, onClick: () => void, primary = false) => (
+  return (
     <Tap
       key={label}
       onClick={onClick}
@@ -594,6 +504,217 @@ function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; 
       {label}
     </Tap>
   );
+};
+
+const untilText = (ms: number) => {
+  const min = Math.max(1, Math.round(ms / 60_000));
+  if (min < 60) return `in ${min}m`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `in ${h}h ${min % 60}m` : `in ${Math.floor(h / 24)}d ${h % 24}h`;
+};
+
+/**
+ * Any number of alarms, each on chosen days. Rings while the dashboard is open, until
+ * stopped (or for five minutes), and can be snoozed. `rang` remembers which alarm last
+ * went off at which minute, so a second tab or a re-render doesn't ring it twice.
+ */
+function AlarmNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; ctx: Ctx }) {
+  const actions = useComponentActions();
+  const live = !inert(ctx);
+  const p = ctx.params;
+  useTick(1000);
+  const alarms = parseAlarms(p.alarms);
+  const now = new Date();
+  const hour12 = String(p.clock ?? "24") === "12";
+  const snoozeMin = Math.max(1, Number(p.snooze) || 9);
+  const ringingSince = Number(p.ringing) || 0;
+  const ringing = ringingSince > 0 && now.getTime() - ringingSince < 5 * 60_000;
+  const snoozeUntil = Number(p.snoozeUntil) || 0;
+  const ringingAlarm = alarms.find((a) => a.id === p.ringingId);
+
+  const patch = (fn: (prev: Patch) => Patch) => {
+    if (ctx.widgetId) actions.patchParams(ctx.widgetId, fn);
+  };
+
+  // Start ringing when an alarm's minute arrives, or a snooze runs out.
+  useEffect(() => {
+    if (!live) return;
+    const minute = formatDate(now, "YYYY-MM-DD HH:mm");
+    const hm = formatDate(now, "HH:mm");
+    if (snoozeUntil && now.getTime() >= snoozeUntil) {
+      patch((prev): Patch => (Number(prev.snoozeUntil) === snoozeUntil ? { snoozeUntil: 0, ringing: Date.now() } : {}));
+      return;
+    }
+    const due = alarms.find((a) => a.on && a.time === hm && (a.once || !a.days.length || a.days.includes(now.getDay())));
+    if (!due || String(p.rang) === `${due.id}@${minute}`) return;
+    patch((prev): Patch => {
+      if (String(prev.rang) === `${due.id}@${minute}`) return {};
+      const list = parseAlarms(prev.alarms).map((a) => (a.id === due.id && a.once ? { ...a, on: false } : a));
+      return { rang: `${due.id}@${minute}`, ringing: Date.now(), ringingId: due.id, snoozeUntil: 0, alarms: writeAlarms(list) };
+    });
+  });
+
+  useEffect(() => {
+    if (!live || !ringing) return;
+    chime(4);
+    const id = setInterval(() => chime(4), 2000);
+    return () => clearInterval(id);
+  }, [live, ringing]);
+
+  const control = pill(live);
+  const timeText = (hm: string) => {
+    if (!hour12) return hm;
+    const [h, m] = hm.split(":").map(Number);
+    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  };
+
+  const upcoming = alarms
+    .map((a) => ({ a, at: nextRing(a, now) }))
+    .filter((x): x is { a: Alarm; at: Date } => !!x.at)
+    .sort((x, y) => x.at.getTime() - y.at.getTime());
+  const next = upcoming[0];
+
+  let caption = "";
+  let display = "";
+  let buttons: ReactNode[] = [];
+  if (ringing) {
+    caption = `${ringingAlarm?.label || "Alarm"} — ringing`;
+    display = timeText(ringingAlarm?.time ?? formatDate(now, "HH:mm"));
+    buttons = [
+      control("Stop", () => patch((): Patch => ({ ringing: 0, snoozeUntil: 0 })), true),
+      control(`Snooze ${snoozeMin}m`, () => patch((): Patch => ({ ringing: 0, snoozeUntil: Date.now() + snoozeMin * 60_000 }))),
+    ];
+  } else if (snoozeUntil > now.getTime()) {
+    caption = `${ringingAlarm?.label || "Alarm"} · snoozing`;
+    display = countdownText(snoozeUntil - now.getTime());
+    buttons = [control("Stop", () => patch((): Patch => ({ snoozeUntil: 0 })), true)];
+  } else if (next) {
+    caption = `${next.a.label || "Alarm"} · ${untilText(next.at.getTime() - now.getTime())}`;
+    display = timeText(next.a.time);
+  } else {
+    caption = alarms.length ? "All alarms off" : "No alarms yet";
+    display = "--:--";
+  }
+
+  const toggle = (id: string) =>
+    patch((prev): Patch => ({ alarms: writeAlarms(parseAlarms(prev.alarms).map((a) => (a.id === id ? { ...a, on: !a.on } : a))) }));
+  const Tap = live ? "button" : "span";
+  const big = SIZES[node.size ?? "2xl"];
+  const listed = ringing || snoozeUntil > now.getTime() ? [] : alarms.filter((a) => a.id !== next?.a.id || alarms.length > 1);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.45em", width: "100%" }}>
+      <div style={{ fontSize: "0.75em", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, textAlign: "center", color: ringing ? "var(--accent)" : undefined, opacity: ringing ? 1 : 0.6 }}>
+        {caption}
+      </div>
+      <div style={{ fontSize: `${big}em`, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: ringing ? "var(--accent)" : undefined }}>{display}</div>
+      {buttons.length ? <div style={{ display: "flex", gap: "0.4em", flexWrap: "wrap", justifyContent: "center" }}>{buttons}</div> : null}
+      {listed.length ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35em", justifyContent: "center", maxWidth: "100%" }}>
+          {listed.slice(0, 6).map((a) => (
+            <Tap
+              key={a.id}
+              onClick={() => toggle(a.id)}
+              title={a.on ? "Tap to turn off" : "Tap to turn on"}
+              style={{
+                display: "inline-flex",
+                gap: "0.35em",
+                alignItems: "baseline",
+                padding: "0.2em 0.6em",
+                borderRadius: 999,
+                border: "1px solid currentColor",
+                background: "transparent",
+                color: "inherit",
+                font: "inherit",
+                fontSize: "0.7em",
+                opacity: a.on ? 0.85 : 0.35,
+                textDecoration: a.on ? undefined : "line-through",
+                cursor: "pointer",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <b>{timeText(a.time)}</b>
+              <span>{alarmDaysText(a)}</span>
+            </Tap>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; ctx: Ctx }) {
+  const actions = useComponentActions();
+  const live = !inert(ctx);
+  const p = ctx.params;
+  const run = Number(p.run) || 0;
+  const running = run > 0;
+  useTick(running ? 100 : 1000);
+
+  const now = Date.now();
+  const elapsed = (Number(p.acc) || 0) + (running ? now - run : 0);
+  // The countdown and focus timer became one step-based timer; old designs still name them.
+  const mode = node.mode === "countdown" || node.mode === "pomodoro" ? "intervals" : node.mode;
+
+  const patch = (fn: (prev: Patch) => Patch) => {
+    if (ctx.widgetId) actions.patchParams(ctx.widgetId, fn);
+  };
+
+  // The routine: which step of which round, and how long that step lasts.
+  const routine = routineOf(p);
+  const stepIndex = Math.min(Math.max(0, Number(p.step) || 0), routine.steps.length - 1);
+  const round = Math.max(1, Number(p.round) || 1);
+  const step = stepAt(routine, stepIndex, round);
+  const total = mode === "intervals" ? step.sec * 1000 : 0;
+  const remaining = Math.max(0, total - elapsed);
+  // Older saves marked a finished countdown only by banking its whole length.
+  const complete = mode === "intervals" && (Number(p.complete) === 1 || (!running && total > 0 && elapsed >= total));
+  const sound = String(p.sound ?? "yes") !== "no";
+  const multi = routine.steps.length > 1 || routine.rounds !== 1;
+
+  /** Moves past the current step: the next one (running or waiting), or the end of the routine. */
+  const advance = (prev: Patch, keepRunning: boolean): Patch => {
+    const r = routineOf(prev);
+    const at = Math.min(Math.max(0, Number(prev.step) || 0), r.steps.length - 1);
+    const next = nextPosition(r, at, Math.max(1, Number(prev.round) || 1));
+    if (!next) return { run: 0, acc: stepAt(r, at, Number(prev.round) || 1).sec * 1000, complete: 1 };
+    return { step: next.step, round: next.round, acc: 0, run: keepRunning ? Date.now() : 0 };
+  };
+
+  // Reaching the end of a step: chime, then move on by itself or wait for a tap.
+  useEffect(() => {
+    if (!live || mode !== "intervals" || !running || elapsed < total) return;
+    const last = !nextPosition(routine, stepIndex, round);
+    if (sound) chime(last ? 4 : 2);
+    patch((prev): Patch => {
+      if (Number(prev.run) !== run) return {}; // another tab already handled it
+      return advance(prev, routineOf(prev).auto);
+    });
+  });
+
+  const start = () =>
+    patch((prev): Patch => {
+      if (Number(prev.run)) return {};
+      // Starting a finished routine starts it over.
+      if (complete || Number(prev.complete) === 1) return { run: Date.now(), acc: 0, step: 0, round: 1, complete: 0 };
+      return { run: Date.now(), acc: Number(prev.acc) || 0 };
+    });
+  const pause = () =>
+    patch((prev): Patch => {
+      const since = Number(prev.run) || 0;
+      return since ? { run: 0, acc: (Number(prev.acc) || 0) + (Date.now() - since) } : {};
+    });
+  const reset = () => patch((): Patch => ({ run: 0, acc: 0, laps: "", step: 0, round: 1, complete: 0 }));
+  const lap = () =>
+    patch((prev): Patch => {
+      const since = Number(prev.run) || 0;
+      const at = (Number(prev.acc) || 0) + (since ? Date.now() - since : 0);
+      return { laps: [String(Math.round(at)), ...String(prev.laps || "").split(",").filter(Boolean)].slice(0, 20).join(",") };
+    });
+  const addMinute = () => patch((prev): Patch => ({ acc: (Number(prev.acc) || 0) - 60_000 }));
+  const skip = () => patch((prev): Patch => (Number(prev.complete) === 1 ? {} : advance(prev, !!Number(prev.run))));
+
+  const control = pill(live);
 
   const big = SIZES[node.size ?? "2xl"];
   const label = String(p.label || "");
@@ -602,51 +723,53 @@ function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; 
   let caption = label;
   let display = "";
   let buttons: ReactNode[] = [];
+  let footer = "";
+  let progress: number | null = null;
+  const done = complete;
 
   if (mode === "stopwatch") {
     display = clockText(elapsed, true);
     buttons = [running ? control("Pause", pause, true) : control(elapsed ? "Resume" : "Start", start, true), running ? control("Lap", lap) : control("Reset", reset)];
-  } else if (mode === "countdown") {
-    display = clockText(finished ? 0 : remaining);
-    caption = finished ? "Time's up" : label || "Timer";
-    buttons = [
-      running ? control("Pause", pause, true) : control(finished ? "Again" : elapsed ? "Resume" : "Start", start, true),
-      running ? control("+1 min", addMinute) : control("Reset", reset),
-    ];
-  } else if (mode === "pomodoro") {
-    display = clockText(remaining);
-    const done = Number(p.done) || 0;
-    caption = `${phase.label}${done ? ` · ${done} done` : ""}`;
-    buttons = [running ? control("Pause", pause, true) : control(elapsed ? "Resume" : "Start", start, true), control("Skip", skip), control("Reset", reset)];
-  } else {
-    display = at;
-    const [hh, mm] = at.split(":").map(Number);
-    const next = new Date(now);
-    next.setHours(hh || 0, mm || 0, 0, 0);
-    if (next.getTime() <= now) next.setDate(next.getDate() + 1);
-    const inMin = Math.round((next.getTime() - now) / 60_000);
-    caption = ringing ? `${label || "Alarm"} — ringing` : armed ? `${label || "Alarm"} · in ${inMin >= 60 ? `${Math.floor(inMin / 60)}h ${inMin % 60}m` : `${inMin}m`}` : `${label || "Alarm"} · off`;
-    buttons = ringing
-      ? [control("Stop", () => patch((): Patch => ({ ringing: 0 })), true)]
-      : [control(armed ? "Turn off" : "Turn on", () => patch((prev): Patch => ({ armed: String(prev.armed ?? "yes") === "no" ? "yes" : "no" })), !armed)];
+  } else if (mode === "intervals") {
+    // Stopped at the very start of a step that isn't the first: the routine is waiting for a tap.
+    const waiting = !running && !complete && elapsed === 0 && (stepIndex > 0 || round > 1);
+    display = countdownText(complete ? 0 : remaining);
+    const roundText = routine.rounds === 1 ? "" : routine.rounds ? ` · Round ${round} of ${routine.rounds}` : ` · Round ${round}`;
+    caption = complete ? (multi ? "All done" : "Time's up") : `${waiting ? "Next: " : ""}${step.name || "Timer"}${roundText}`;
+    progress = total && !complete ? Math.min(1, elapsed / total) : complete ? 1 : 0;
+    const primary = running
+      ? control("Pause", pause, true)
+      : control(complete ? "Again" : waiting ? "Continue" : elapsed ? "Resume" : "Start", start, true);
+    buttons = [primary];
+    if (running) buttons.push(control("+1 min", addMinute));
+    if (multi && !complete) buttons.push(control("Skip", skip));
+    if (!running && (elapsed || stepIndex || round > 1 || complete)) buttons.push(control("Reset", reset));
+    if (multi && !complete) {
+      const next = nextPosition(routine, stepIndex, round);
+      if (next) {
+        const after = stepAt(routine, next.step, next.round);
+        footer = `Then ${after.name || "the next step"} · ${countdownText(after.sec * 1000)}`;
+      }
+    }
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.45em", width: "100%" }}>
       {caption ? (
-        <div style={{ fontSize: "0.75em", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, color: ringing || finished ? "var(--accent)" : undefined, opacity: ringing || finished ? 1 : 0.6 }}>
+        <div style={{ fontSize: "0.75em", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, textAlign: "center", color: done ? "var(--accent)" : undefined, opacity: done ? 1 : 0.6 }}>
           {caption}
         </div>
       ) : null}
-      <div style={{ fontSize: `${big}em`, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: ringing || finished ? "var(--accent)" : undefined }}>
+      <div style={{ fontSize: `${big}em`, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: done ? "var(--accent)" : undefined }}>
         {display}
       </div>
-      {mode === "pomodoro" && total ? (
-        <div style={{ width: "70%", height: "0.3em", borderRadius: 999, background: "rgba(255,255,255,.14)" }}>
-          <div style={{ width: `${Math.min(100, (elapsed / total) * 100)}%`, height: "100%", borderRadius: 999, background: "var(--accent)" }} />
+      {progress !== null && multi ? (
+        <div style={{ width: "70%", height: "0.3em", borderRadius: 999, background: "rgba(127,127,127,.25)" }}>
+          <div style={{ width: `${progress * 100}%`, height: "100%", borderRadius: 999, background: "var(--accent)" }} />
         </div>
       ) : null}
       <div style={{ display: "flex", gap: "0.4em", flexWrap: "wrap", justifyContent: "center" }}>{buttons}</div>
+      {footer ? <div style={{ fontSize: "0.72em", opacity: 0.55, fontVariantNumeric: "tabular-nums" }}>{footer}</div> : null}
       {mode === "stopwatch" && laps.length ? (
         <div style={{ fontSize: "0.75em", opacity: 0.6, fontVariantNumeric: "tabular-nums", textAlign: "center" }}>
           {laps.slice(0, 3).map((t, i) => (
@@ -656,6 +779,68 @@ function TimerNode({ node, ctx }: { node: Extract<CompNode, { kind: "timer" }>; 
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** The time in a zone as hours and minutes, plus how its calendar day compares with here. */
+const zoneTime = (tz: string, now: Date, hour12: boolean) => {
+  const opts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12, ...(tz ? { timeZone: tz } : {}) };
+  try {
+    const time = new Intl.DateTimeFormat(hour12 ? "en-US" : "en-GB", opts).format(now);
+    const there = new Date(now.toLocaleString("en-US", tz ? { timeZone: tz } : {}));
+    const here = new Date(now.toLocaleString("en-US"));
+    const hours = Math.round((there.getTime() - here.getTime()) / 36e5 * 2) / 2;
+    const dayGap = Math.round((new Date(there.toDateString()).getTime() - new Date(here.toDateString()).getTime()) / 864e5);
+    const offset = hours === 0 ? "Same time" : `${hours > 0 ? "+" : "−"}${Math.abs(hours)}h`;
+    const day = dayGap > 0 ? "Tomorrow" : dayGap < 0 ? "Yesterday" : "Today";
+    return { time, offset, day, night: there.getHours() < 6 || there.getHours() >= 20 };
+  } catch {
+    return { time: "—", offset: "Unknown zone", day: "", night: false };
+  }
+};
+
+function ClocksNode({ node, ctx }: { node: Extract<CompNode, { kind: "clocks" }>; ctx: Ctx }) {
+  useTick(1000);
+  const places = parsePlaces(ctx.params.places);
+  const hour12 = String(ctx.params.clock ?? "24") === "12";
+  const details = String(ctx.params.details ?? "yes") !== "no";
+  const now = new Date();
+  if (!places.length) return <div style={{ opacity: 0.55, fontSize: "0.85em", textAlign: "center" }}>Add a place in this clock's options.</div>;
+  const single = places.length === 1;
+  const timeSize = single ? SIZES[node.size ?? "2xl"] : SIZES[node.size ?? "lg"];
+  return (
+    <div
+      style={{
+        // Wrapping flex rather than a grid, so a last row with fewer places stays centred.
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        alignContent: "center",
+        gap: "0.9em 0.7em",
+        width: "100%",
+      }}
+    >
+      {places.map((place, i) => {
+        const t = zoneTime(place.tz, now, hour12);
+        return (
+          <div key={i} style={{ flex: `1 1 ${Math.max(5, timeSize * 3.2)}em`, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.15em", minWidth: 0 }}>
+            <div style={{ fontSize: "0.72em", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, color: "var(--accent)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+              {place.label || cityFromZone(place.tz)}
+            </div>
+            <div style={{ fontSize: `${timeSize}em`, fontWeight: 700, lineHeight: 1.05, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+              {t.time}
+            </div>
+            {details ? (
+              <div style={{ fontSize: "0.68em", opacity: 0.55, whiteSpace: "nowrap" }}>
+                {t.night ? "☾ " : ""}
+                {t.day}
+                {place.tz ? ` · ${t.offset}` : ""}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -111,7 +111,14 @@ export type CompNode =
    * A running clock with its own controls. State lives in the component's settings as
    * timestamps ("run" = running since, "acc" = time banked), so it survives a reload.
    */
-  | { kind: "timer"; mode: "stopwatch" | "countdown" | "pomodoro" | "alarm"; size?: SizeToken }
+  | {
+      kind: "timer";
+      /** "intervals" runs the steps in the component's settings; "countdown" and "pomodoro" are older names for it. */
+      mode: "stopwatch" | "intervals" | "countdown" | "pomodoro" | "alarm";
+      size?: SizeToken;
+    }
+  /** The time in each place listed in the component's `places` setting, as a grid. */
+  | { kind: "clocks"; size?: SizeToken }
   /** Does something when tapped: fetch the data again, or change a setting. */
   | {
       kind: "button";
@@ -130,9 +137,12 @@ export type ComponentParam = {
   key: string;
   label: string;
   hint?: string;
-  kind: "number" | "text" | "select" | "toggle";
+  /** "steps", "places" and "alarms" are lists kept as JSON text, each with an editor of its own. */
+  kind: "number" | "text" | "select" | "toggle" | "steps" | "places" | "alarms";
   options?: { value: string; label: string }[];
   default: string | number;
+  /** Only shown while another setting isn't a given value — keeps options that don't apply out of the way. */
+  showIf?: { param: string; not: string | number };
 };
 
 /** A slot the component fills with one of the dashboard's data sources. */

@@ -194,5 +194,6 @@ export async function searchPlaces(query: string) {
     name: r.name as string,
     lat: num(r.latitude),
     lon: num(r.longitude),
+    timezone: (r.timezone as string) ?? "",
   }));
 }

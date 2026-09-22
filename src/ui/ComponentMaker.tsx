@@ -22,10 +22,13 @@ import type { FieldDef } from "../data/types";
 import { FONTS, rectFor } from "../lib/board";
 import type { AnimationRule, BreakpointKey, Rect, Screen, Widget, WidgetStyle } from "../lib/types";
 import { Icon, type IconName } from "./icons";
+import { AlarmsEditor, PlacesEditor, StepsEditor } from "./ListEditors";
 import { ACCENT_SWATCHES } from "./Toolbar";
 import { Button, ColorField, Dialog, Disclosure, Field, Intro, Section, Segmented, NumberField, Toggle, inputClass } from "./kit";
 
 const PREVIEW = { w: 560, h: 340 };
+/** How the page arranges a self-arranging design inside its card. */
+const pageFlow = { display: "flex", flexDirection: "column", justifyContent: "safe center", textAlign: "start" } as const;
 const HANDLES = ["nw", "ne", "sw", "se"] as const;
 
 const COLOR_CHOICES: { value: ColorRole; label: string }[] = [
@@ -112,6 +115,7 @@ function Maker({
   const setTree = (next: CompNode) => setInstance({ tree: next });
   const setStyle = (patch: Partial<WidgetStyle>) => update(widget.id, { style: { ...style, ...patch } });
   const setParam = (key: string, value: string | number) => setInstance({ params: { ...instance.params, [key]: value } });
+  const setParams = (patch: Record<string, string | number>) => setInstance({ params: { ...instance.params, ...patch } });
 
   const item = canvas?.items.find((i) => i.id === selected) ?? null;
 
@@ -272,7 +276,8 @@ function Maker({
               />
             ) : null}
 
-            <div className="pointer-events-none absolute inset-0">
+            {/* Laid out the way the page lays it out (ComponentView), so the preview matches. */}
+            <div className="pointer-events-none absolute inset-0" style={canvas ? undefined : pageFlow}>
               {renderComponent({ def, instance: { ...instance, tree }, states: store.states, sources: store.sources, preview: true })}
             </div>
 
@@ -355,6 +360,7 @@ function Maker({
             height: Math.max(40, rect.h - style.padding * 2),
             fontSize: 16,
             fontFamily: style.fontFamily === "inherit" ? undefined : `"${style.fontFamily}", system-ui`,
+            ...(canvas ? {} : pageFlow),
           }}
         >
           {renderComponent({ def, instance: { ...instance, tree }, states: store.states, sources: store.sources, preview: true })}
@@ -421,6 +427,46 @@ function Maker({
         </Section>
       ) : null}
 
+      {(def.params ?? []).length ? (
+        <Section title="Options">
+          {(def.params ?? []).map((p) => {
+            const value = instance.params[p.key] ?? p.default;
+            const all = { ...Object.fromEntries((def.params ?? []).map((d) => [d.key, d.default])), ...instance.params };
+            if (p.showIf && String(all[p.showIf.param]) === String(p.showIf.not)) return null;
+            // List settings have their own editors; their JSON hint is for agents, not people.
+            if (p.kind === "steps" || p.kind === "places" || p.kind === "alarms")
+              return (
+                <Field key={p.key} label={p.label} stacked>
+                  {p.kind === "steps" ? (
+                    <StepsEditor value={value} params={all} onChange={setParams} />
+                  ) : p.kind === "places" ? (
+                    <PlacesEditor value={value} onChange={setParams} />
+                  ) : (
+                    <AlarmsEditor value={value} onChange={setParams} />
+                  )}
+                </Field>
+              );
+            return (
+              <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
+                {p.kind === "number" ? (
+                  <NumberField value={Number(value)} onChange={(v) => setParam(p.key, v)} label={p.label} />
+                ) : p.kind === "select" ? (
+                  <Segmented
+                    value={String(value)}
+                    onChange={(v) => setParam(p.key, v)}
+                    options={(p.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
+                  />
+                ) : p.kind === "toggle" ? (
+                  <Toggle checked={String(value) === "yes"} onChange={(on) => setParam(p.key, on ? "yes" : "no")} label={p.label} />
+                ) : (
+                  <input className={inputClass} value={String(value)} onChange={(e) => setParam(p.key, e.target.value)} />
+                )}
+              </Field>
+            );
+          })}
+        </Section>
+      ) : null}
+
       <Section title="Look" hint="Everything inside follows these unless it has its own.">
         <Field label="Background" stacked>
           <ColorField
@@ -479,31 +525,6 @@ function Maker({
           </Field>
         </Disclosure>
       </Section>
-
-      {(def.params ?? []).length ? (
-        <Section title="Options">
-          {(def.params ?? []).map((p) => {
-            const value = instance.params[p.key] ?? p.default;
-            return (
-              <Field key={p.key} label={p.label} help={p.hint} stacked={p.kind !== "number"}>
-                {p.kind === "number" ? (
-                  <NumberField value={Number(value)} onChange={(v) => setParam(p.key, v)} label={p.label} />
-                ) : p.kind === "select" ? (
-                  <Segmented
-                    value={String(value)}
-                    onChange={(v) => setParam(p.key, v)}
-                    options={(p.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
-                  />
-                ) : p.kind === "toggle" ? (
-                  <Toggle checked={String(value) === "yes"} onChange={(on) => setParam(p.key, on ? "yes" : "no")} label={p.label} />
-                ) : (
-                  <input className={inputClass} value={String(value)} onChange={(e) => setParam(p.key, e.target.value)} />
-                )}
-              </Field>
-            );
-          })}
-        </Section>
-      ) : null}
 
       <Section title="Size & position" hint={`On the ${(screens.find((s) => s.key === bp) ?? screens[screens.length - 1]).label.toLowerCase()} screen only.`}>
         <div className="mb-3 grid grid-cols-4 gap-2">

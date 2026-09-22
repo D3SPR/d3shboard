@@ -51,6 +51,8 @@ export const timer = (mode: Extract<CompNode, { kind: "timer" }>["mode"], o: Opt
   ...o,
 });
 
+export const clocks = (o: Opts<"clocks"> = {}): CompNode => ({ kind: "clocks", ...o });
+
 export const divider: CompNode = { kind: "divider" };
 
 export const spacer: CompNode = { kind: "spacer" };

@@ -1,4 +1,5 @@
-import { bind, col, param, row, spacer, text, timer, when } from "../nodes.ts";
+import { bind, clocks, col, param, row, spacer, text, timer, when } from "../nodes.ts";
+import { writeAlarms, writePlaces, writeSteps } from "../timing.ts";
 import type { ComponentDef } from "../types";
 
 const needsTime = [{ key: "time", kind: "time", label: "Time & date" }];
@@ -80,20 +81,27 @@ export const TIME_COMPONENTS: ComponentDef[] = [
   {
     id: "time.world",
     name: "World clock",
-    description: "The time somewhere else, with a label you choose.",
+    description: "The time in one place or many, side by side, with how far ahead each is.",
     icon: "globe",
     category: "Time",
-    size: { w: 260, h: 150 },
-    needs: [{ key: "time", kind: "time", label: "Time & date (set its time zone)" }],
-    params: [{ key: "label", label: "Label", kind: "text", default: "Tokyo" }],
-    root: col(
-      [
-        text(param("label"), { size: "sm", color: "accent", caps: true, weight: 600 }),
-        text(bind("time", "now", { pattern: "HH:mm" }), { size: "2xl", weight: 700 }),
-        text(bind("time", "weekdayShort"), { size: "xs", color: "muted" }),
-      ],
-      { gap: 0.15, align: "center" },
-    ),
+    size: { w: 420, h: 180 },
+    needs: [],
+    params: [
+      {
+        key: "places",
+        label: "Places",
+        kind: "places",
+        hint: 'A JSON list like [{"label":"Tokyo","tz":"Asia/Tokyo"}]. An empty tz is this device\'s own time.',
+        default: writePlaces([
+          { label: "New York", tz: "America/New_York" },
+          { label: "London", tz: "Europe/London" },
+          { label: "Tokyo", tz: "Asia/Tokyo" },
+        ]),
+      },
+      clockParam,
+      { key: "details", label: "Show the day and hours ahead", kind: "toggle", default: "yes" },
+    ],
+    root: col([clocks()], { justify: "center", align: "center" }),
   },
   {
     id: "time.stopwatch",
@@ -109,45 +117,62 @@ export const TIME_COMPONENTS: ComponentDef[] = [
   {
     id: "time.timer",
     name: "Timer",
-    description: "Counts down and chimes at zero. Add a minute while it runs.",
-    icon: "timer",
-    category: "Time",
-    size: { w: 300, h: 210 },
-    needs: [],
-    params: [
-      { key: "label", label: "What it's for", kind: "text", default: "" },
-      { key: "minutes", label: "Minutes", kind: "number", default: 5 },
-      { key: "seconds", label: "Seconds", kind: "number", default: 0 },
-    ],
-    root: col([timer("countdown")], { justify: "center", align: "center" }),
-  },
-  {
-    id: "time.pomodoro",
-    name: "Focus timer",
-    description: "Pomodoro: focus, short break, repeat, with a longer break every few rounds.",
+    description: "A countdown, pomodoro or workout intervals: set the steps and rounds, and choose whether each step starts by itself.",
     icon: "timer",
     category: "Time",
     size: { w: 320, h: 240 },
     needs: [],
     params: [
-      { key: "work", label: "Focus minutes", kind: "number", default: 25 },
-      { key: "short", label: "Short break minutes", kind: "number", default: 5 },
-      { key: "long", label: "Long break minutes", kind: "number", default: 15 },
-      { key: "every", label: "Long break every", kind: "number", hint: "How many focus rounds before a long break.", default: 4 },
+      {
+        key: "steps",
+        label: "Steps",
+        kind: "steps",
+        hint: 'A JSON list like [{"name":"Focus","sec":1500},{"name":"Break","sec":300}], run in order.',
+        default: writeSteps([{ name: "Timer", sec: 300 }]),
+      },
+      { key: "rounds", label: "Rounds", kind: "number", hint: "How many times to go through the steps. 0 keeps going until you stop it.", default: 1 },
+      {
+        key: "auto",
+        label: "When a step ends",
+        kind: "select",
+        default: "auto",
+        options: [
+          { value: "auto", label: "Start the next" },
+          { value: "wait", label: "Wait for me" },
+        ],
+        showIf: { param: "rounds", not: 1 },
+      },
+      {
+        key: "longBreak",
+        label: "Long break (minutes)",
+        kind: "number",
+        hint: "Takes the place of the last step every few rounds, like a pomodoro's long break. 0 for none.",
+        default: 0,
+        showIf: { param: "rounds", not: 1 },
+      },
+      { key: "longEvery", label: "Long break every", kind: "number", hint: "How many rounds between long breaks.", default: 4, showIf: { param: "longBreak", not: 0 } },
+      { key: "sound", label: "Chime", kind: "toggle", default: "yes" },
     ],
-    root: col([timer("pomodoro")], { justify: "center", align: "center" }),
+    root: col([timer("intervals")], { justify: "center", align: "center" }),
   },
   {
     id: "time.alarm",
     name: "Alarm",
-    description: "Rings at the same time every day while the dashboard is open.",
+    description: "One alarm or several, on the days you choose, with snooze. Rings while the dashboard is open.",
     icon: "clock",
     category: "Time",
-    size: { w: 300, h: 200 },
+    size: { w: 320, h: 220 },
     needs: [],
     params: [
-      { key: "label", label: "Label", kind: "text", default: "Wake up" },
-      { key: "at", label: "Time", kind: "text", hint: "24-hour, like 07:30 or 18:00.", default: "07:00" },
+      {
+        key: "alarms",
+        label: "Alarms",
+        kind: "alarms",
+        hint: 'A JSON list like [{"id":"a1","time":"07:00","label":"Wake up","days":[1,2,3,4,5],"on":true}]. Days run 0 (Sunday) to 6; none means every day.',
+        default: writeAlarms([{ id: "a1", time: "07:00", label: "Wake up", days: [1, 2, 3, 4, 5], on: true }]),
+      },
+      { key: "snooze", label: "Snooze for", kind: "number", hint: "Minutes.", default: 9 },
+      clockParam,
     ],
     root: col([timer("alarm")], { justify: "center", align: "center" }),
   },
