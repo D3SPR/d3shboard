@@ -19,7 +19,10 @@ npm run typecheck  # app (tsc -b) + MCP server (tsc -p mcp)
 npm run build      # typecheck + production build to dist/
 npm run build:single  # one self-contained HTML file in dist-single/ (JS, CSS and favicon inlined) for static hosting
 npm run build:bridge  # standalone bridge bundle in dist-bridge/ (runs on plain Node, no install)
+npm run build:site    # build + bridge copied into dist/ — what the d3shboard.app Worker serves
 ```
+
+**Hosting:** `wrangler.jsonc` makes the repo a static-assets Cloudflare Worker on `d3shboard.app` (Workers Builds: build command `npm run build:site`, deploy command `npx wrangler deploy`). The single-file build is still copied to d3tech.xyz/d3shboard as well.
 
 `node mcp/server.ts --stdio` runs the same bridge for MCP clients that launch servers themselves. The MCP server runs as TypeScript directly via Node's built-in type stripping (Node 23.6+), with no build step.
 

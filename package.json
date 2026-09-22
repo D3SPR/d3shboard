@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "mcp": "node mcp/server.ts",
     "build:single": "tsc -b && vite build --mode single",
-    "build:bridge": "esbuild mcp/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist-bridge/d3shboard-bridge.mjs --external:bufferutil --external:utf-8-validate --log-level=warning --banner:js=\"import{createRequire as ___cr}from'node:module';const require=___cr(import.meta.url);\""
+    "build:bridge": "esbuild mcp/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist-bridge/d3shboard-bridge.mjs --external:bufferutil --external:utf-8-validate --log-level=warning --banner:js=\"import{createRequire as ___cr}from'node:module';const require=___cr(import.meta.url);\"",
+    "build:site": "npm run build && npm run build:bridge && cp dist-bridge/d3shboard-bridge.mjs dist/"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

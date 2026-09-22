@@ -1,0 +1,16 @@
+// Cloudflare Workers config for d3shboard.app. The app has no backend, so this is a
+// static-assets-only Worker: Workers Builds runs `npm run build:site` (app + agent
+// bridge download) and then `npx wrangler deploy`, which uploads dist/.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "d3shboard",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    { "pattern": "d3shboard.app", "custom_domain": true },
+    { "pattern": "www.d3shboard.app", "custom_domain": true }
+  ]
+}
